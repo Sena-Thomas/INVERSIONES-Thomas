@@ -12,7 +12,6 @@ import os
 from sqlalchemy import create_engine, Column, Integer, String, Float, DateTime
 from sqlalchemy.orm import declarative_base, sessionmaker
 
-# Crea un archivo local llamado 'boveda_financiera.db'
 SQLALCHEMY_DATABASE_URL = "sqlite:///./boveda_financiera.db"
 engine = create_engine(SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False})
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
@@ -28,26 +27,27 @@ class CapitalHistoryDB(Base):
 class InvestmentDB(Base):
     __tablename__ = "investments"
     id = Column(Integer, primary_key=True, index=True)
-    type = Column(String, index=True) # "PASIVA" (Dafuturo) o "RIESGO" (Acciones)
+    type = Column(String, index=True) # "PASIVA" o "ACTIVA"
     asset_name = Column(String, index=True)
     invested_amount = Column(Float)
     current_value = Column(Float)
 
 class ExpenseDB(Base):
-    __tablename__ = "expenses" # Gastos Hormiga
+    __tablename__ = "expenses" # Gastos Hormiga y Billetera
     id = Column(Integer, primary_key=True, index=True)
+    type = Column(String) # "INGRESO" o "GASTO"
     description = Column(String)
     amount = Column(Float)
     date = Column(DateTime, default=datetime.utcnow)
 
-# Creamos las tablas en el archivo
 Base.metadata.create_all(bind=engine)
 
 # ==========================================
 # 🧠 CONFIGURACIÓN DE LA IA
 # ==========================================
-GOOGLE_API_KEY = "TU_API_KEY_AQUI" 
-genai.configure(api_key=GAIzaSyDRG1cAEDgYbApzTfxGbwWatOsroyS2wek)
+# CORRECCIÓN: Usar variables de entorno o string con comillas para la API KEY
+GOOGLE_API_KEY = os.getenv("GEMINI_API_KEY", "TU_API_KEY_AQUI_CON_COMILLAS") 
+genai.configure(api_key=GOOGLE_API_KEY)
 model = genai.GenerativeModel('gemini-2.5-flash') 
 
 # ==========================================
@@ -63,7 +63,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# --- DEPENDENCIAS ---
 def get_db():
     db = SessionLocal()
     try:
@@ -71,34 +70,107 @@ def get_db():
     finally:
         db.close()
 
-# Modelos Pydantic para recibir datos del Frontend
-class CapitalCreate(BaseModel):
+# ==========================================
+# 💸 GASTOS HORMIGA Y BILLETERA (NUEVO)
+# ==========================================
+class ExpenseCreate(BaseModel):
+    type: str # "INGRESO" o "GASTO"
+    description: str = "Movimiento General"
     amount: float
 
-# ==========================================
-# 🔌 ENDPOINTS DE LA BASE DE DATOS
-# ==========================================
-
-@app.post("/api/capital")
-def add_capital_history(capital: CapitalCreate):
-    """Guarda un nuevo registro de tu capital total en la historia"""
+@app.get("/api/wallet")
+def get_wallet_movements():
+    """Trae todos los ingresos y gastos hormiga"""
     db = SessionLocal()
-    new_record = CapitalHistoryDB(amount=capital.amount)
+    records = db.query(ExpenseDB).order_by(ExpenseDB.date.desc()).all()
+    # Calcular saldo disponible
+    saldo = sum(r.amount if r.type == "INGRESO" else -r.amount for r in records)
+    db.close()
+    return {"saldo_billetera": saldo, "movimientos": records}
+
+@app.post("/api/wallet")
+def add_wallet_movement(expense: ExpenseCreate):
+    """Agrega dinero a tu billetera o registra un gasto hormiga"""
+    db = SessionLocal()
+    new_record = ExpenseDB(
+        type=expense.type,
+        description=expense.description,
+        amount=expense.amount
+    )
     db.add(new_record)
     db.commit()
     db.refresh(new_record)
     db.close()
-    return {"status": "success", "message": "Capital histórico guardado papu"}
+    return {"status": "success", "data": new_record}
 
-@app.get("/api/capital")
-def get_capital_history():
-    """Trae todo el historial para dibujar la gráfica en la Terminal"""
+# ==========================================
+# 📈 ENDPOINTS DEL PORTAFOLIO (INVERSIONES)
+# ==========================================
+class InvestmentCreate(BaseModel):
+    type: str # "PASIVA" o "ACTIVA"
+    asset_name: str
+    invested_amount: float
+    current_value: float
+
+@app.get("/api/investments")
+def get_investments():
     db = SessionLocal()
-    records = db.query(CapitalHistoryDB).all()
+    records = db.query(InvestmentDB).all()
     db.close()
-    return [{"id": r.id, "amount": r.amount, "date": r.date} for r in records]
+    return records
 
-# (Los endpoints de Yahoo Finance y el Chat siguen iguales abajo)
+@app.post("/api/investments")
+def add_investment(inv: InvestmentCreate):
+    db = SessionLocal()
+    new_inv = InvestmentDB(
+        type=inv.type,
+        asset_name=inv.asset_name.upper(),
+        invested_amount=inv.invested_amount,
+        current_value=inv.current_value
+    )
+    db.add(new_inv)
+    db.commit()
+    db.refresh(new_inv)
+    db.close()
+    return {"status": "success", "data": new_inv}
+
+@app.delete("/api/investments/{inv_id}")
+def delete_investment(inv_id: int):
+    db = SessionLocal()
+    inv = db.query(InvestmentDB).filter(InvestmentDB.id == inv_id).first()
+    if not inv:
+        db.close()
+        raise HTTPException(status_code=404, detail="Inversión no encontrada")
+    db.delete(inv)
+    db.commit()
+    db.close()
+    return {"status": "success"}
+
+# ==========================================
+# 🌐 ENDPOINTS GENERALES Y MERCADO
+# ==========================================
+@app.get("/api/capital-neto")
+def get_capital_neto():
+    """Calcula el Capital Neto Total: (Total Inversiones) + (Saldo Billetera)"""
+    db = SessionLocal()
+    
+    # Sumar billetera
+    movimientos = db.query(ExpenseDB).all()
+    saldo_billetera = sum(m.amount if m.type == "INGRESO" else -m.amount for m in movimientos)
+    
+    # Sumar valor actual de inversiones
+    inversiones = db.query(InvestmentDB).all()
+    total_inversiones = sum(i.current_value for i in inversiones)
+    
+    db.close()
+    return {
+        "capital_neto_total": saldo_billetera + total_inversiones,
+        "desglose": {
+            "billetera": saldo_billetera,
+            "inversiones": total_inversiones
+        }
+    }
+
 @app.get("/api/asset/{ticker}")
 def get_asset_data(ticker: str):
     try:
@@ -121,50 +193,3 @@ def chat_with_ai(request: ChatRequest):
         return {"response": response.text}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-        # --- MODELOS PYDANTIC PARA INVERSIONES ---
-class InvestmentCreate(BaseModel):
-    type: str # "PASIVA" o "RIESGO"
-    asset_name: str
-    invested_amount: float
-    current_value: float
-
-# ==========================================
-# 📈 ENDPOINTS DEL PORTAFOLIO (INVERSIONES)
-# ==========================================
-
-@app.get("/api/investments")
-def get_investments():
-    """Trae todas tus inversiones guardadas en la base de datos"""
-    db = SessionLocal()
-    records = db.query(InvestmentDB).all()
-    db.close()
-    return records
-
-@app.post("/api/investments")
-def add_investment(inv: InvestmentCreate):
-    """Guarda una nueva inversión en tu portafolio"""
-    db = SessionLocal()
-    new_inv = InvestmentDB(
-        type=inv.type,
-        asset_name=inv.asset_name.upper(),
-        invested_amount=inv.invested_amount,
-        current_value=inv.current_value
-    )
-    db.add(new_inv)
-    db.commit()
-    db.refresh(new_inv)
-    db.close()
-    return {"status": "success", "data": new_inv}
-
-@app.delete("/api/investments/{inv_id}")
-def delete_investment(inv_id: int):
-    """Vende/Elimina una inversión de tu portafolio"""
-    db = SessionLocal()
-    inv = db.query(InvestmentDB).filter(InvestmentDB.id == inv_id).first()
-    if not inv:
-        db.close()
-        raise HTTPException(status_code=404, detail="Inversión no encontrada")
-    db.delete(inv)
-    db.commit()
-    db.close()
-    return {"status": "success", "message": "Inversión eliminada"}
