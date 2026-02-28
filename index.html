@@ -1,0 +1,831 @@
+<!DOCTYPE html>
+<html lang="es" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Giga Terminal Financiero</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: { DEFAULT: '#6366f1', dark: '#4f46e5', light: '#a5b4fc' },
+            surface: { DEFAULT: '#1e1e2e', card: '#2a2a3e', border: '#3a3a5c' }
+          }
+        }
+      }
+    }
+  </script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+  <style>
+    body { background: #12121e; color: #e2e8f0; font-family: 'Segoe UI', system-ui, sans-serif; }
+    .tab-btn.active { border-bottom: 2px solid #6366f1; color: #a5b4fc; }
+    .card { background: #1e1e2e; border: 1px solid #3a3a5c; border-radius: 12px; }
+    .btn-primary { background: #6366f1; color: #fff; border-radius: 8px; padding: 8px 18px; transition: background 0.2s; }
+    .btn-primary:hover { background: #4f46e5; }
+    .btn-danger { background: #ef4444; color: #fff; border-radius: 8px; padding: 4px 12px; transition: background 0.2s; }
+    .btn-danger:hover { background: #dc2626; }
+    .btn-ghost { background: transparent; border: 1px solid #3a3a5c; color: #a5b4fc; border-radius: 8px; padding: 6px 14px; transition: background 0.2s; }
+    .btn-ghost:hover { background: #2a2a3e; }
+    .modal-backdrop { background: rgba(0,0,0,0.7); }
+    input, select { background: #12121e; border: 1px solid #3a3a5c; color: #e2e8f0; border-radius: 8px; padding: 8px 12px; width: 100%; }
+    input:focus, select:focus { outline: none; border-color: #6366f1; }
+    .inv-badge { border-radius: 6px; padding: 2px 10px; font-size: 0.75rem; font-weight: 600; }
+    .badge-pasiva { background: #1e3a5f; color: #60a5fa; }
+    .badge-activa { background: #1e3a2f; color: #34d399; }
+    .badge-ingreso { background: #1e3a2f; color: #34d399; }
+    .badge-gasto { background: #3a1e1e; color: #f87171; }
+    .color-swatch { width: 18px; height: 18px; border-radius: 4px; display: inline-block; }
+    ::-webkit-scrollbar { width: 6px; } ::-webkit-scrollbar-track { background: #12121e; } ::-webkit-scrollbar-thumb { background: #3a3a5c; border-radius: 3px; }
+  </style>
+</head>
+<body class="min-h-screen">
+
+<!-- ===== HEADER ===== -->
+<header class="sticky top-0 z-40 flex items-center justify-between px-6 py-3" style="background:#1e1e2e;border-bottom:1px solid #3a3a5c;">
+  <div class="flex items-center gap-3">
+    <i class="fa-solid fa-bolt text-brand text-xl"></i>
+    <span class="font-bold text-lg tracking-tight text-white">Giga Terminal</span>
+  </div>
+  <div id="capital-header" class="text-right">
+    <p class="text-xs text-slate-400">Capital Neto</p>
+    <p id="header-capital" class="font-bold text-brand-light text-lg">$—</p>
+  </div>
+</header>
+
+<!-- ===== TABS ===== -->
+<nav class="flex gap-0 px-6 pt-4 border-b border-surface-border">
+  <button onclick="showTab('estado')" id="tab-estado" class="tab-btn active px-5 py-2 text-sm font-medium text-slate-300 mr-1">
+    <i class="fa-solid fa-gauge-high mr-1"></i> Mi Estado
+  </button>
+  <button onclick="showTab('inversiones')" id="tab-inversiones" class="tab-btn px-5 py-2 text-sm font-medium text-slate-400 mr-1">
+    <i class="fa-solid fa-chart-line mr-1"></i> Inversiones
+  </button>
+  <button onclick="showTab('buscar')" id="tab-buscar" class="tab-btn px-5 py-2 text-sm font-medium text-slate-400">
+    <i class="fa-solid fa-magnifying-glass mr-1"></i> Buscar
+  </button>
+</nav>
+
+<!-- ===== MAIN ===== -->
+<main class="max-w-5xl mx-auto px-4 py-6 space-y-6">
+
+  <!-- ========== TAB 1: MI ESTADO ========== -->
+  <div id="tab-content-estado">
+
+    <!-- Row 1: Stats -->
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div class="card p-5">
+        <p class="text-xs text-slate-400 mb-1"><i class="fa-solid fa-wallet mr-1"></i>Capital Neto Total</p>
+        <p id="stat-capital" class="text-2xl font-bold text-brand-light">$—</p>
+        <p id="stat-capital-breakdown" class="text-xs text-slate-500 mt-1">billetera + inversiones</p>
+      </div>
+      <div class="card p-5">
+        <p class="text-xs text-slate-400 mb-1"><i class="fa-solid fa-money-bill-wave mr-1"></i>Billetera Disponible</p>
+        <p id="stat-wallet" class="text-2xl font-bold text-emerald-400">$—</p>
+        <p class="text-xs text-slate-500 mt-1">saldo libre</p>
+      </div>
+      <div class="card p-5">
+        <p class="text-xs text-slate-400 mb-1"><i class="fa-solid fa-piggy-bank mr-1"></i>Total Inversiones</p>
+        <p id="stat-investments" class="text-2xl font-bold text-yellow-400">$—</p>
+        <p class="text-xs text-slate-500 mt-1">valor actual</p>
+      </div>
+    </div>
+
+    <!-- Row 2: Wallet actions + history -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+      <!-- Wallet action -->
+      <div class="card p-5">
+        <h3 class="font-semibold text-sm text-slate-300 mb-3"><i class="fa-solid fa-plus-minus mr-1"></i> Registrar Movimiento</h3>
+        <div class="space-y-3">
+          <div>
+            <label class="text-xs text-slate-400 block mb-1">Descripción</label>
+            <input id="mov-desc" type="text" placeholder="Ej: Salario, Café, etc." />
+          </div>
+          <div>
+            <label class="text-xs text-slate-400 block mb-1">Monto ($)</label>
+            <input id="mov-amount" type="number" min="0.01" step="0.01" placeholder="0.00" />
+          </div>
+          <div class="flex gap-2 mt-2">
+            <button onclick="addMovement('INGRESO')" class="btn-primary flex-1 text-sm font-medium">
+              <i class="fa-solid fa-plus mr-1"></i> Ingreso
+            </button>
+            <button onclick="addMovement('GASTO')" class="btn-danger flex-1 text-sm font-medium">
+              <i class="fa-solid fa-minus mr-1"></i> Gasto
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Capital history chart -->
+      <div class="card p-5">
+        <h3 class="font-semibold text-sm text-slate-300 mb-3"><i class="fa-solid fa-chart-area mr-1"></i> Historial de Capital</h3>
+        <canvas id="chart-capital" height="160"></canvas>
+      </div>
+    </div>
+
+    <!-- Row 3: Movements table -->
+    <div class="card p-5">
+      <h3 class="font-semibold text-sm text-slate-300 mb-3"><i class="fa-solid fa-list mr-1"></i> Últimos Movimientos</h3>
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead>
+            <tr class="text-slate-500 text-xs border-b border-surface-border">
+              <th class="pb-2 text-left">Fecha</th>
+              <th class="pb-2 text-left">Descripción</th>
+              <th class="pb-2 text-right">Monto</th>
+              <th class="pb-2 text-right">Tipo</th>
+            </tr>
+          </thead>
+          <tbody id="movements-table">
+            <tr><td colspan="4" class="text-center text-slate-500 py-4">Cargando...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== TAB 2: INVERSIONES ========== -->
+  <div id="tab-content-inversiones" class="hidden">
+
+    <div class="flex items-center justify-between mb-4">
+      <h2 class="font-bold text-slate-200 text-lg"><i class="fa-solid fa-briefcase mr-2 text-brand"></i>Mi Portafolio</h2>
+      <button onclick="openInvModal()" class="btn-primary text-sm">
+        <i class="fa-solid fa-plus mr-1"></i> Nueva Inversión
+      </button>
+    </div>
+
+    <!-- Charts row -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+      <div class="card p-5">
+        <h3 class="font-semibold text-xs text-slate-400 mb-3"><i class="fa-solid fa-scale-balanced mr-1"></i>Pasiva vs Activa</h3>
+        <canvas id="chart-inv-type" height="200"></canvas>
+      </div>
+      <div class="card p-5">
+        <h3 class="font-semibold text-xs text-slate-400 mb-3"><i class="fa-solid fa-chart-bar mr-1"></i>Rendimiento por Activo</h3>
+        <canvas id="chart-inv-perf" height="200"></canvas>
+      </div>
+    </div>
+
+    <!-- Investments list -->
+    <div class="card p-5">
+      <h3 class="font-semibold text-sm text-slate-300 mb-3">Lista de Inversiones</h3>
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead>
+            <tr class="text-slate-500 text-xs border-b border-surface-border">
+              <th class="pb-2 text-left">Color</th>
+              <th class="pb-2 text-left">Activo</th>
+              <th class="pb-2 text-left">Tipo</th>
+              <th class="pb-2 text-right">Invertido</th>
+              <th class="pb-2 text-right">Valor Actual</th>
+              <th class="pb-2 text-right">Rend.</th>
+              <th class="pb-2 text-center">Acción</th>
+            </tr>
+          </thead>
+          <tbody id="investments-table">
+            <tr><td colspan="7" class="text-center text-slate-500 py-4">Cargando...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== TAB 3: BUSCAR ========== -->
+  <div id="tab-content-buscar" class="hidden">
+    <h2 class="font-bold text-slate-200 text-lg mb-4"><i class="fa-solid fa-earth-americas mr-2 text-brand"></i>Explorar Activos</h2>
+
+    <div class="mb-4">
+      <input id="search-input" type="text" placeholder="Buscar por nombre o ticker..." oninput="filterAssets()" />
+    </div>
+
+    <!-- Category filters -->
+    <div class="flex flex-wrap gap-2 mb-4" id="category-filters">
+      <button onclick="filterByCategory('all')" data-cat="all" class="btn-ghost text-xs active-cat">Todos</button>
+      <button onclick="filterByCategory('etf')" data-cat="etf" class="btn-ghost text-xs">ETFs</button>
+      <button onclick="filterByCategory('stock')" data-cat="stock" class="btn-ghost text-xs">Stocks</button>
+      <button onclick="filterByCategory('crypto')" data-cat="crypto" class="btn-ghost text-xs">Cripto</button>
+      <button onclick="filterByCategory('bond')" data-cat="bond" class="btn-ghost text-xs">Bonos</button>
+    </div>
+
+    <div id="assets-grid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3"></div>
+  </div>
+
+</main>
+
+<!-- ========== MODAL: NUEVA INVERSIÓN ========== -->
+<div id="inv-modal" class="fixed inset-0 z-50 hidden flex items-center justify-center modal-backdrop p-4">
+  <div class="card w-full max-w-md p-6 relative" style="background:#1e1e2e;">
+    <button onclick="closeInvModal()" class="absolute top-4 right-4 text-slate-400 hover:text-white"><i class="fa-solid fa-xmark text-lg"></i></button>
+    <h3 class="font-bold text-lg text-white mb-4"><i class="fa-solid fa-plus-circle mr-2 text-brand"></i>Nueva Inversión</h3>
+    <div class="space-y-3">
+      <div>
+        <label class="text-xs text-slate-400 block mb-1">Nombre / Ticker</label>
+        <input id="inv-name" type="text" placeholder="Ej: MELI, BTC, DaFuturo..." />
+      </div>
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="text-xs text-slate-400 block mb-1">Tipo</label>
+          <select id="inv-type">
+            <option value="PASIVA">Pasiva</option>
+            <option value="ACTIVA">Activa</option>
+          </select>
+        </div>
+        <div>
+          <label class="text-xs text-slate-400 block mb-1">Color</label>
+          <div class="flex gap-2 flex-wrap mt-1" id="color-picker">
+            <span class="color-swatch cursor-pointer ring-2 ring-white" style="background:#6366f1;" data-color="#6366f1" onclick="selectColor(this)"></span>
+            <span class="color-swatch cursor-pointer" style="background:#34d399;" data-color="#34d399" onclick="selectColor(this)"></span>
+            <span class="color-swatch cursor-pointer" style="background:#f59e0b;" data-color="#f59e0b" onclick="selectColor(this)"></span>
+            <span class="color-swatch cursor-pointer" style="background:#ef4444;" data-color="#ef4444" onclick="selectColor(this)"></span>
+            <span class="color-swatch cursor-pointer" style="background:#06b6d4;" data-color="#06b6d4" onclick="selectColor(this)"></span>
+            <span class="color-swatch cursor-pointer" style="background:#f97316;" data-color="#f97316" onclick="selectColor(this)"></span>
+            <span class="color-swatch cursor-pointer" style="background:#ec4899;" data-color="#ec4899" onclick="selectColor(this)"></span>
+            <span class="color-swatch cursor-pointer" style="background:#a3e635;" data-color="#a3e635" onclick="selectColor(this)"></span>
+          </div>
+        </div>
+      </div>
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="text-xs text-slate-400 block mb-1">Monto Invertido ($)</label>
+          <input id="inv-invested" type="number" min="0.01" step="0.01" placeholder="0.00" />
+        </div>
+        <div>
+          <label class="text-xs text-slate-400 block mb-1">Valor Actual ($)</label>
+          <input id="inv-current" type="number" min="0.01" step="0.01" placeholder="0.00" />
+        </div>
+      </div>
+      <div>
+        <label class="text-xs text-slate-400 block mb-1">Liquidez</label>
+        <select id="inv-liquidity">
+          <option value="ALTA">Alta (ej: ETFs, Stocks)</option>
+          <option value="MEDIA">Media (ej: FCI)</option>
+          <option value="BAJA">Baja (ej: Plazo Fijo, DaFuturo)</option>
+        </select>
+      </div>
+    </div>
+    <div class="mt-5 flex gap-3">
+      <button onclick="closeInvModal()" class="btn-ghost flex-1 text-sm">Cancelar</button>
+      <button onclick="saveInvestment()" class="btn-primary flex-1 text-sm font-semibold">
+        <i class="fa-solid fa-floppy-disk mr-1"></i> Guardar
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ========== MODAL: AGREGAR AL PORTAFOLIO desde Buscar ========== -->
+<div id="add-asset-modal" class="fixed inset-0 z-50 hidden flex items-center justify-center modal-backdrop p-4">
+  <div class="card w-full max-w-sm p-6 relative" style="background:#1e1e2e;">
+    <button onclick="closeAddAssetModal()" class="absolute top-4 right-4 text-slate-400 hover:text-white"><i class="fa-solid fa-xmark text-lg"></i></button>
+    <h3 class="font-bold text-lg text-white mb-1"><i class="fa-solid fa-cart-plus mr-2 text-brand"></i>Agregar al Portafolio</h3>
+    <p id="add-asset-name" class="text-sm text-slate-400 mb-4"></p>
+    <div class="space-y-3">
+      <div>
+        <label class="text-xs text-slate-400 block mb-1">Tipo</label>
+        <select id="add-inv-type">
+          <option value="ACTIVA">Activa</option>
+          <option value="PASIVA">Pasiva</option>
+        </select>
+      </div>
+      <div>
+        <label class="text-xs text-slate-400 block mb-1">Monto Invertido ($)</label>
+        <input id="add-inv-invested" type="number" min="0.01" step="0.01" placeholder="0.00" />
+      </div>
+      <div>
+        <label class="text-xs text-slate-400 block mb-1">Valor Actual ($)</label>
+        <input id="add-inv-current" type="number" min="0.01" step="0.01" placeholder="0.00" />
+      </div>
+    </div>
+    <div class="mt-5 flex gap-3">
+      <button onclick="closeAddAssetModal()" class="btn-ghost flex-1 text-sm">Cancelar</button>
+      <button onclick="confirmAddAsset()" class="btn-primary flex-1 text-sm font-semibold">
+        <i class="fa-solid fa-plus mr-1"></i> Agregar
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== TOAST ===== -->
+<div id="toast" class="fixed bottom-6 right-6 z-50 hidden px-4 py-3 rounded-lg text-sm font-medium shadow-xl" style="background:#1e1e2e;border:1px solid #3a3a5c;min-width:220px;">
+  <i id="toast-icon" class="fa-solid fa-check-circle mr-2 text-emerald-400"></i>
+  <span id="toast-msg"></span>
+</div>
+
+<script>
+// ======================================================
+//  STATE
+// ======================================================
+const STATE = {
+  investments: [],         // from /api/investments
+  movements: [],           // from /api/wallet
+  capitalData: [],         // synthetic history: [{date, capital}]
+  selectedColor: '#6366f1',
+  addAssetTicker: '',
+  addAssetFullName: '',
+  currentCategory: 'all',
+  charts: {}
+};
+
+// ======================================================
+//  UTILITY
+// ======================================================
+const fmt = (n) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'USD', minimumFractionDigits: 2 }).format(n);
+const fmtDate = (d) => new Date(d).toLocaleDateString('es-AR', { day:'2-digit', month:'short' });
+
+function showToast(msg, type = 'success') {
+  const t = document.getElementById('toast');
+  const icon = document.getElementById('toast-icon');
+  document.getElementById('toast-msg').textContent = msg;
+  icon.className = type === 'success'
+    ? 'fa-solid fa-check-circle mr-2 text-emerald-400'
+    : 'fa-solid fa-triangle-exclamation mr-2 text-red-400';
+  t.classList.remove('hidden');
+  setTimeout(() => t.classList.add('hidden'), 3000);
+}
+
+function showTab(name) {
+  ['estado','inversiones','buscar'].forEach(t => {
+    document.getElementById('tab-content-' + t).classList.add('hidden');
+    document.getElementById('tab-' + t).classList.remove('active');
+    document.getElementById('tab-' + t).classList.add('text-slate-400');
+  });
+  document.getElementById('tab-content-' + name).classList.remove('hidden');
+  document.getElementById('tab-' + name).classList.add('active');
+  document.getElementById('tab-' + name).classList.remove('text-slate-400');
+  if (name === 'inversiones') renderInvestmentCharts();
+}
+
+// ======================================================
+//  API HELPERS
+// ======================================================
+async function apiGet(url) {
+  try {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(res.statusText);
+    return res.json();
+  } catch (err) {
+    console.error('GET', url, err);
+    return null;
+  }
+}
+async function apiPost(url, body) {
+  try {
+    const res = await fetch(url, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body) });
+    if (!res.ok) throw new Error(res.statusText);
+    return res.json();
+  } catch (err) {
+    console.error('POST', url, err);
+    return null;
+  }
+}
+async function apiDelete(url) {
+  try {
+    const res = await fetch(url, { method: 'DELETE' });
+    if (!res.ok) throw new Error(res.statusText);
+    return res.json();
+  } catch (err) {
+    console.error('DELETE', url, err);
+    return null;
+  }
+}
+
+// ======================================================
+//  LOAD DATA
+// ======================================================
+async function loadAll() {
+  const [capitalData, walletData, invData] = await Promise.all([
+    apiGet('/api/capital-neto'),
+    apiGet('/api/wallet'),
+    apiGet('/api/investments')
+  ]);
+
+  // Investments
+  STATE.investments = invData || [];
+
+  // Movements
+  if (walletData && walletData.movimientos) {
+    STATE.movements = walletData.movimientos;
+  }
+
+  // Capital summary
+  const billetera = walletData ? (walletData.saldo_billetera || 0) : 0;
+  const totalInv = STATE.investments.reduce((s, i) => s + (i.current_value || 0), 0);
+  const capitalNeto = capitalData ? (capitalData.capital_neto_total || billetera + totalInv) : billetera + totalInv;
+
+  // Update header
+  document.getElementById('header-capital').textContent = fmt(capitalNeto);
+  document.getElementById('stat-capital').textContent = fmt(capitalNeto);
+  document.getElementById('stat-wallet').textContent = fmt(billetera);
+  document.getElementById('stat-investments').textContent = fmt(totalInv);
+  document.getElementById('stat-capital-breakdown').textContent =
+    `Billetera: ${fmt(billetera)} + Inv: ${fmt(totalInv)}`;
+
+  // Build synthetic capital history from movements
+  buildCapitalHistory(STATE.movements, totalInv);
+  renderCapitalChart();
+  renderMovementsTable();
+  renderInvestmentsTable();
+}
+
+function buildCapitalHistory(movements, currentInv) {
+  // Sort movements by date ascending
+  const sorted = [...movements].sort((a, b) => new Date(a.date) - new Date(b.date));
+  let running = 0;
+  const points = [];
+  sorted.forEach(m => {
+    running += m.type === 'INGRESO' ? m.amount : -m.amount;
+    points.push({ date: m.date, capital: running + currentInv });
+  });
+  if (points.length === 0) {
+    const today = new Date().toISOString();
+    points.push({ date: today, capital: currentInv });
+  }
+  STATE.capitalData = points;
+}
+
+// ======================================================
+//  CHART: CAPITAL HISTORY
+// ======================================================
+function renderCapitalChart() {
+  const ctx = document.getElementById('chart-capital').getContext('2d');
+  if (STATE.charts.capital) STATE.charts.capital.destroy();
+  const labels = STATE.capitalData.map(p => fmtDate(p.date));
+  const data   = STATE.capitalData.map(p => p.capital);
+  STATE.charts.capital = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [{
+        label: 'Capital Neto',
+        data,
+        borderColor: '#6366f1',
+        backgroundColor: 'rgba(99,102,241,0.15)',
+        tension: 0.4,
+        fill: true,
+        pointRadius: 3,
+        pointBackgroundColor: '#6366f1'
+      }]
+    },
+    options: {
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { ticks: { color: '#64748b', font: { size: 10 } }, grid: { color: '#1e293b' } },
+        y: { ticks: { color: '#64748b', font: { size: 10 }, callback: v => '$' + v.toFixed(0) }, grid: { color: '#1e293b' } }
+      }
+    }
+  });
+}
+
+// ======================================================
+//  MOVEMENTS TABLE
+// ======================================================
+function renderMovementsTable() {
+  const tbody = document.getElementById('movements-table');
+  if (!STATE.movements.length) {
+    tbody.innerHTML = '<tr><td colspan="4" class="text-center text-slate-500 py-6">Sin movimientos registrados.</td></tr>';
+    return;
+  }
+  const rows = STATE.movements.slice(0, 20).map(m => {
+    const isIngreso = m.type === 'INGRESO';
+    return `<tr class="border-b border-surface-border hover:bg-surface-card transition-colors">
+      <td class="py-2 text-xs text-slate-500">${fmtDate(m.date)}</td>
+      <td class="py-2 text-sm">${m.description || '—'}</td>
+      <td class="py-2 text-right font-mono text-sm ${isIngreso ? 'text-emerald-400' : 'text-red-400'}">
+        ${isIngreso ? '+' : '-'}${fmt(m.amount)}
+      </td>
+      <td class="py-2 text-right">
+        <span class="inv-badge ${isIngreso ? 'badge-ingreso' : 'badge-gasto'}">${m.type}</span>
+      </td>
+    </tr>`;
+  });
+  tbody.innerHTML = rows.join('');
+}
+
+// ======================================================
+//  ADD MOVEMENT (WALLET)
+// ======================================================
+async function addMovement(type) {
+  const desc   = document.getElementById('mov-desc').value.trim() || (type === 'INGRESO' ? 'Ingreso' : 'Gasto');
+  const amount = parseFloat(document.getElementById('mov-amount').value);
+  if (!amount || amount <= 0) { showToast('Ingresa un monto válido', 'error'); return; }
+  const res = await apiPost('/api/wallet', { type, description: desc, amount });
+  if (res) {
+    document.getElementById('mov-desc').value = '';
+    document.getElementById('mov-amount').value = '';
+    showToast(type === 'INGRESO' ? 'Ingreso registrado ✓' : 'Gasto registrado ✓');
+    await loadAll();
+  } else {
+    showToast('Error al conectar con el servidor', 'error');
+  }
+}
+
+// ======================================================
+//  INVESTMENTS TABLE + CRUD
+// ======================================================
+function renderInvestmentsTable() {
+  const tbody = document.getElementById('investments-table');
+  if (!STATE.investments.length) {
+    tbody.innerHTML = '<tr><td colspan="7" class="text-center text-slate-500 py-6">Sin inversiones. Agrega una con el botón +</td></tr>';
+    return;
+  }
+  const rows = STATE.investments.map(inv => {
+    const rend = inv.invested_amount > 0
+      ? (((inv.current_value - inv.invested_amount) / inv.invested_amount) * 100).toFixed(2)
+      : 0;
+    const rendColor = rend >= 0 ? 'text-emerald-400' : 'text-red-400';
+    const color = inv.color || '#6366f1';
+    return `<tr class="border-b border-surface-border hover:bg-surface-card transition-colors">
+      <td class="py-2"><span class="color-swatch" style="background:${color};"></span></td>
+      <td class="py-2 font-semibold">${inv.asset_name}</td>
+      <td class="py-2"><span class="inv-badge ${inv.type === 'PASIVA' ? 'badge-pasiva' : 'badge-activa'}">${inv.type}</span></td>
+      <td class="py-2 text-right font-mono text-sm">${fmt(inv.invested_amount)}</td>
+      <td class="py-2 text-right font-mono text-sm">${fmt(inv.current_value)}</td>
+      <td class="py-2 text-right font-mono text-sm ${rendColor}">${rend > 0 ? '+' : ''}${rend}%</td>
+      <td class="py-2 text-center">
+        <button onclick="deleteInvestment(${inv.id})" class="btn-danger text-xs py-1 px-2">
+          <i class="fa-solid fa-trash-can"></i>
+        </button>
+      </td>
+    </tr>`;
+  });
+  tbody.innerHTML = rows.join('');
+}
+
+async function deleteInvestment(id) {
+  if (!confirm('¿Eliminar esta inversión?')) return;
+  const res = await apiDelete('/api/investments/' + id);
+  if (res) {
+    showToast('Inversión eliminada');
+    await loadAll();
+    renderInvestmentCharts();
+  } else {
+    showToast('Error al eliminar', 'error');
+  }
+}
+
+// ======================================================
+//  INVESTMENT CHARTS
+// ======================================================
+function renderInvestmentCharts() {
+  renderTypeChart();
+  renderPerfChart();
+}
+
+function renderTypeChart() {
+  const ctx = document.getElementById('chart-inv-type').getContext('2d');
+  if (STATE.charts.invType) STATE.charts.invType.destroy();
+
+  const pasiva = STATE.investments.filter(i => i.type === 'PASIVA').reduce((s, i) => s + i.current_value, 0);
+  const activa = STATE.investments.filter(i => i.type === 'ACTIVA').reduce((s, i) => s + i.current_value, 0);
+
+  if (pasiva + activa === 0) {
+    ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+    return;
+  }
+
+  STATE.charts.invType = new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+      labels: ['Pasiva', 'Activa'],
+      datasets: [{ data: [pasiva, activa], backgroundColor: ['#60a5fa', '#34d399'], borderWidth: 0 }]
+    },
+    options: {
+      plugins: {
+        legend: { labels: { color: '#94a3b8', font: { size: 12 } } }
+      }
+    }
+  });
+}
+
+function renderPerfChart() {
+  const ctx = document.getElementById('chart-inv-perf').getContext('2d');
+  if (STATE.charts.invPerf) STATE.charts.invPerf.destroy();
+  if (!STATE.investments.length) return;
+
+  const labels = STATE.investments.map(i => i.asset_name);
+  const rend   = STATE.investments.map(i => {
+    if (!i.invested_amount) return 0;
+    return parseFloat((((i.current_value - i.invested_amount) / i.invested_amount) * 100).toFixed(2));
+  });
+  const colors = STATE.investments.map(i => i.color || '#6366f1');
+
+  STATE.charts.invPerf = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{
+        label: 'Rendimiento (%)',
+        data: rend,
+        backgroundColor: colors,
+        borderRadius: 6
+      }]
+    },
+    options: {
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { ticks: { color: '#64748b', font: { size: 10 } }, grid: { color: '#1e293b' } },
+        y: {
+          ticks: { color: '#64748b', font: { size: 10 }, callback: v => v + '%' },
+          grid: { color: '#1e293b' }
+        }
+      }
+    }
+  });
+}
+
+// ======================================================
+//  INVESTMENT MODAL
+// ======================================================
+function openInvModal() {
+  document.getElementById('inv-modal').classList.remove('hidden');
+}
+function closeInvModal() {
+  document.getElementById('inv-modal').classList.add('hidden');
+  ['inv-name','inv-invested','inv-current'].forEach(id => document.getElementById(id).value = '');
+}
+
+function selectColor(el) {
+  document.querySelectorAll('#color-picker .color-swatch').forEach(s => s.classList.remove('ring-2','ring-white'));
+  el.classList.add('ring-2','ring-white');
+  STATE.selectedColor = el.dataset.color;
+}
+
+async function saveInvestment() {
+  const name    = document.getElementById('inv-name').value.trim();
+  const type    = document.getElementById('inv-type').value;
+  const invested = parseFloat(document.getElementById('inv-invested').value);
+  const current  = parseFloat(document.getElementById('inv-current').value);
+
+  if (!name) { showToast('Ingresa un nombre/ticker', 'error'); return; }
+  if (!invested || invested <= 0) { showToast('Monto invertido inválido', 'error'); return; }
+  if (!current || current <= 0)   { showToast('Valor actual inválido', 'error'); return; }
+
+  const payload = {
+    type,
+    asset_name: name,
+    invested_amount: invested,
+    current_value: current,
+    color: STATE.selectedColor,
+    liquidity: document.getElementById('inv-liquidity').value
+  };
+
+  const res = await apiPost('/api/investments', payload);
+  if (res) {
+    closeInvModal();
+    showToast('Inversión guardada ✓');
+    await loadAll();
+    renderInvestmentCharts();
+  } else {
+    showToast('Error al guardar. Verifica que el backend esté activo.', 'error');
+  }
+}
+
+// ======================================================
+//  SEARCH / ASSETS CATALOG
+// ======================================================
+const ASSETS_CATALOG = [
+  // ETFs
+  { ticker: 'SPY',   name: 'SPDR S&P 500 ETF',           cat: 'etf',    sector: 'US Market',      change: '+1.2%',  price: '$530.40' },
+  { ticker: 'QQQ',   name: 'Invesco Nasdaq-100 ETF',      cat: 'etf',    sector: 'Tech',           change: '+1.8%',  price: '$472.10' },
+  { ticker: 'VTI',   name: 'Vanguard Total Stock Market', cat: 'etf',    sector: 'US Market',      change: '+0.9%',  price: '$245.30' },
+  { ticker: 'IWM',   name: 'iShares Russell 2000 ETF',    cat: 'etf',    sector: 'Small Cap',      change: '-0.4%',  price: '$202.80' },
+  { ticker: 'EEM',   name: 'iShares MSCI Emerging Mkts',  cat: 'etf',    sector: 'Emerging',       change: '+0.6%',  price: '$43.50'  },
+  { ticker: 'GLD',   name: 'SPDR Gold Shares ETF',        cat: 'etf',    sector: 'Commodities',    change: '+0.3%',  price: '$218.90' },
+  { ticker: 'XLF',   name: 'Financial Select Sector SPDR',cat: 'etf',    sector: 'Financials',     change: '+0.7%',  price: '$41.20'  },
+  { ticker: 'ARKK',  name: 'ARK Innovation ETF',          cat: 'etf',    sector: 'Innovation',     change: '-1.5%',  price: '$51.70'  },
+  // Stocks
+  { ticker: 'AAPL',  name: 'Apple Inc.',                  cat: 'stock',  sector: 'Tech',           change: '+1.0%',  price: '$182.50' },
+  { ticker: 'MSFT',  name: 'Microsoft Corporation',       cat: 'stock',  sector: 'Tech',           change: '+1.4%',  price: '$415.80' },
+  { ticker: 'GOOGL', name: 'Alphabet Inc.',               cat: 'stock',  sector: 'Tech',           change: '+0.8%',  price: '$178.20' },
+  { ticker: 'AMZN',  name: 'Amazon.com Inc.',             cat: 'stock',  sector: 'E-Commerce',     change: '+2.1%',  price: '$195.40' },
+  { ticker: 'NVDA',  name: 'NVIDIA Corporation',          cat: 'stock',  sector: 'Semiconductors', change: '+3.5%',  price: '$875.30' },
+  { ticker: 'TSLA',  name: 'Tesla Inc.',                  cat: 'stock',  sector: 'Auto/Tech',      change: '-2.3%',  price: '$248.60' },
+  { ticker: 'META',  name: 'Meta Platforms Inc.',         cat: 'stock',  sector: 'Social Media',   change: '+1.9%',  price: '$512.40' },
+  { ticker: 'MELI',  name: 'MercadoLibre Inc.',           cat: 'stock',  sector: 'LatAm E-Comm',   change: '+2.7%',  price: '$1820.00'},
+  { ticker: 'BRK.B', name: 'Berkshire Hathaway B',        cat: 'stock',  sector: 'Conglomerate',   change: '+0.5%',  price: '$378.90' },
+  { ticker: 'JPM',   name: 'JPMorgan Chase & Co.',        cat: 'stock',  sector: 'Banking',        change: '+0.9%',  price: '$198.30' },
+  // Crypto
+  { ticker: 'BTC',   name: 'Bitcoin',                     cat: 'crypto', sector: 'Crypto',         change: '+4.2%',  price: '$67,800' },
+  { ticker: 'ETH',   name: 'Ethereum',                    cat: 'crypto', sector: 'Crypto',         change: '+3.1%',  price: '$3,520'  },
+  { ticker: 'BNB',   name: 'Binance Coin',                cat: 'crypto', sector: 'Crypto',         change: '+1.6%',  price: '$420'    },
+  { ticker: 'SOL',   name: 'Solana',                      cat: 'crypto', sector: 'Crypto',         change: '+5.8%',  price: '$165'    },
+  { ticker: 'ADA',   name: 'Cardano',                     cat: 'crypto', sector: 'Crypto',         change: '-1.2%',  price: '$0.58'   },
+  // Bonds / Fixed Income
+  { ticker: 'TLT',   name: 'iShares 20+ Yr Treasury ETF', cat: 'bond',   sector: 'Fixed Income',   change: '-0.3%',  price: '$92.10'  },
+  { ticker: 'HYG',   name: 'iShares High Yield Corp Bond', cat: 'bond',  sector: 'Fixed Income',   change: '+0.2%',  price: '$77.40'  },
+  { ticker: 'DAFUTURO', name: 'DaFuturo (AR)',            cat: 'bond',   sector: 'FCI Argentina',  change: '+0.1%',  price: 'ARS'     },
+  { ticker: 'PLAZO', name: 'Plazo Fijo (AR)',             cat: 'bond',   sector: 'Argentina',      change: '+0.08%', price: 'ARS'     },
+];
+
+let filteredAssets = [...ASSETS_CATALOG];
+
+function renderAssetsGrid(assets) {
+  const grid = document.getElementById('assets-grid');
+  if (!assets.length) {
+    grid.innerHTML = '<p class="col-span-3 text-center text-slate-500 py-8">Sin resultados.</p>';
+    return;
+  }
+  const changeColor = (c) => c.startsWith('-') ? 'text-red-400' : 'text-emerald-400';
+  const catColors = { etf: 'bg-indigo-900 text-indigo-300', stock: 'bg-emerald-900 text-emerald-300', crypto: 'bg-yellow-900 text-yellow-300', bond: 'bg-blue-900 text-blue-300' };
+  // Build cards using DOM to avoid XSS via string interpolation
+  grid.innerHTML = '';
+  assets.forEach(a => {
+    const card = document.createElement('div');
+    card.className = 'card p-4 cursor-pointer hover:border-brand transition-all';
+    card.dataset.ticker = a.ticker;
+    card.innerHTML = `
+      <div class="flex items-start justify-between mb-2">
+        <div>
+          <span class="font-bold text-white"></span>
+          <span class="ml-2 text-xs px-2 py-0.5 rounded-full ${catColors[a.cat] || ''}"></span>
+        </div>
+        <span class="text-sm font-mono ${changeColor(a.change)}"></span>
+      </div>
+      <p class="text-xs text-slate-400 mb-1 truncate"></p>
+      <div class="flex items-center justify-between mt-2">
+        <span class="text-xs text-slate-500"></span>
+        <span class="text-sm font-semibold text-slate-200"></span>
+      </div>
+      <button class="mt-3 w-full text-xs btn-ghost py-1">
+        <i class="fa-solid fa-plus mr-1"></i> Agregar al portafolio
+      </button>`;
+    card.querySelector('.font-bold').textContent = a.ticker;
+    card.querySelector('.rounded-full').textContent = a.cat.toUpperCase();
+    card.querySelector('.font-mono').textContent = a.change;
+    card.querySelector('.text-slate-400').textContent = a.name;
+    const spans = card.querySelectorAll('.flex.items-center span');
+    spans[0].textContent = a.sector;
+    spans[1].textContent = a.price;
+    card.addEventListener('click', () => openAddAssetModal(a.ticker, a.name));
+    grid.appendChild(card);
+  });
+}
+
+function filterAssets() {
+  const q = document.getElementById('search-input').value.toLowerCase();
+  filteredAssets = ASSETS_CATALOG.filter(a =>
+    (STATE.currentCategory === 'all' || a.cat === STATE.currentCategory) &&
+    (a.ticker.toLowerCase().includes(q) || a.name.toLowerCase().includes(q) || a.sector.toLowerCase().includes(q))
+  );
+  renderAssetsGrid(filteredAssets);
+}
+
+function filterByCategory(cat) {
+  STATE.currentCategory = cat;
+  document.querySelectorAll('#category-filters button').forEach(b => {
+    if (b.dataset.cat === cat) b.style.borderColor = '#6366f1';
+    else b.style.borderColor = '';
+  });
+  filterAssets();
+}
+
+// ======================================================
+//  ADD FROM SEARCH
+// ======================================================
+function openAddAssetModal(ticker, name) {
+  STATE.addAssetTicker = ticker;
+  STATE.addAssetFullName = name;
+  document.getElementById('add-asset-name').textContent = `${ticker} — ${name}`;
+  document.getElementById('add-asset-modal').classList.remove('hidden');
+}
+function closeAddAssetModal() {
+  document.getElementById('add-asset-modal').classList.add('hidden');
+  document.getElementById('add-inv-invested').value = '';
+  document.getElementById('add-inv-current').value = '';
+}
+async function confirmAddAsset() {
+  const type    = document.getElementById('add-inv-type').value;
+  const invested = parseFloat(document.getElementById('add-inv-invested').value);
+  const current  = parseFloat(document.getElementById('add-inv-current').value);
+  if (!invested || invested <= 0) { showToast('Monto invertido inválido', 'error'); return; }
+  if (!current || current <= 0)   { showToast('Valor actual inválido', 'error'); return; }
+
+  const res = await apiPost('/api/investments', {
+    type,
+    asset_name: STATE.addAssetTicker,
+    invested_amount: invested,
+    current_value: current
+  });
+  if (res) {
+    closeAddAssetModal();
+    showToast(`${STATE.addAssetTicker} agregado al portafolio ✓`);
+    await loadAll();
+  } else {
+    showToast('Error al guardar. Verifica que el backend esté activo.', 'error');
+  }
+}
+
+// ======================================================
+//  INIT
+// ======================================================
+document.addEventListener('DOMContentLoaded', () => {
+  loadAll();
+  renderAssetsGrid(ASSETS_CATALOG);
+});
+</script>
+
+</body>
+</html>
