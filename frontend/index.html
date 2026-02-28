@@ -1,0 +1,1390 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Bóveda Financiera</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    :root {
+      --bg: #0a0a0f;
+      --surface: #12121a;
+      --card: #1a1a26;
+      --border: #2a2a3d;
+      --accent: #7c3aed;
+      --accent2: #06b6d4;
+      --green: #10b981;
+      --red: #ef4444;
+      --yellow: #f59e0b;
+      --text: #e2e8f0;
+      --muted: #64748b;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      min-height: 100vh;
+    }
+    /* Scrollbar */
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: var(--surface); }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+    /* Nav */
+    nav {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+      background: rgba(10,10,15,0.95);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+    }
+    .nav-inner {
+      max-width: 1200px; margin: 0 auto;
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0.75rem 1.5rem;
+    }
+    .nav-logo { font-size: 1.25rem; font-weight: 700; color: var(--accent2); letter-spacing: -0.5px; }
+    .nav-tabs { display: flex; gap: 0.25rem; }
+    .nav-tab {
+      padding: 0.5rem 1rem; border-radius: 8px; font-size: 0.875rem; font-weight: 500;
+      cursor: pointer; border: none; background: transparent; color: var(--muted);
+      transition: all 0.2s;
+    }
+    .nav-tab:hover { color: var(--text); background: var(--card); }
+    .nav-tab.active { color: white; background: var(--accent); }
+    .capital-badge {
+      background: var(--card); border: 1px solid var(--border);
+      padding: 0.375rem 0.875rem; border-radius: 8px; font-size: 0.8rem;
+      color: var(--muted);
+    }
+    .capital-badge span { color: var(--accent2); font-weight: 700; font-size: 1rem; }
+
+    /* Layout */
+    main { max-width: 1200px; margin: 0 auto; padding: 5rem 1.5rem 2rem; }
+    .page { display: none; }
+    .page.active { display: block; }
+
+    /* Cards */
+    .card {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: 16px; padding: 1.5rem;
+    }
+    .card-title { font-size: 0.75rem; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.5rem; }
+    .card-value { font-size: 1.75rem; font-weight: 700; }
+
+    /* Grid */
+    .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; }
+    .grid-2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem; }
+    @media (max-width: 768px) { .grid-3, .grid-2 { grid-template-columns: 1fr; } }
+
+    /* Buttons */
+    .btn {
+      padding: 0.5rem 1.25rem; border-radius: 8px; font-size: 0.875rem; font-weight: 500;
+      cursor: pointer; border: none; transition: all 0.2s;
+    }
+    .btn-primary { background: var(--accent); color: white; }
+    .btn-primary:hover { background: #6d28d9; }
+    .btn-success { background: var(--green); color: white; }
+    .btn-success:hover { background: #059669; }
+    .btn-danger { background: var(--red); color: white; }
+    .btn-danger:hover { background: #dc2626; }
+    .btn-ghost {
+      background: transparent; color: var(--muted); border: 1px solid var(--border);
+    }
+    .btn-ghost:hover { color: var(--text); border-color: var(--accent); }
+    .btn-icon {
+      width: 36px; height: 36px; border-radius: 50%; display: inline-flex;
+      align-items: center; justify-content: center; font-size: 1.2rem;
+      cursor: pointer; border: none; transition: all 0.2s;
+    }
+    .btn-icon-green { background: rgba(16,185,129,0.15); color: var(--green); }
+    .btn-icon-green:hover { background: rgba(16,185,129,0.3); }
+    .btn-icon-red { background: rgba(239,68,68,0.15); color: var(--red); }
+    .btn-icon-red:hover { background: rgba(239,68,68,0.3); }
+
+    /* Wallet section */
+    .wallet-btns { display: flex; gap: 0.5rem; margin-top: 1rem; align-items: center; flex-wrap: wrap; }
+    .wallet-input {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 8px; padding: 0.5rem 0.75rem; color: var(--text);
+      font-size: 0.875rem; flex: 1; min-width: 120px;
+    }
+    .wallet-input:focus { outline: none; border-color: var(--accent); }
+
+    /* Investment card */
+    .inv-card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 12px; padding: 1rem 1.25rem;
+      display: flex; align-items: center; gap: 1rem;
+      cursor: pointer; transition: all 0.2s;
+      position: relative; overflow: hidden;
+    }
+    .inv-card:hover { border-color: var(--accent); transform: translateY(-1px); }
+    .inv-color-dot {
+      width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0;
+    }
+    .inv-card-body { flex: 1; min-width: 0; }
+    .inv-card-name { font-weight: 600; font-size: 0.95rem; }
+    .inv-card-sub { font-size: 0.75rem; color: var(--muted); margin-top: 2px; }
+    .inv-card-value { text-align: right; }
+    .inv-card-amount { font-weight: 700; font-size: 1rem; }
+    .inv-card-return { font-size: 0.75rem; margin-top: 2px; }
+    .text-green { color: var(--green); }
+    .text-red { color: var(--red); }
+    .text-yellow { color: var(--yellow); }
+    .text-accent { color: var(--accent2); }
+    .liquid-badge {
+      font-size: 0.65rem; padding: 2px 6px; border-radius: 4px; font-weight: 600;
+      background: rgba(16,185,129,0.15); color: var(--green); margin-left: 6px;
+    }
+    .locked-badge {
+      font-size: 0.65rem; padding: 2px 6px; border-radius: 4px; font-weight: 600;
+      background: rgba(245,158,11,0.15); color: var(--yellow); margin-left: 6px;
+    }
+
+    /* FAB */
+    .fab {
+      position: fixed; bottom: 2rem; right: 2rem; z-index: 99;
+      width: 56px; height: 56px; border-radius: 50%;
+      background: var(--accent); color: white;
+      font-size: 1.75rem; border: none; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      box-shadow: 0 8px 24px rgba(124,58,237,0.4);
+      transition: all 0.2s;
+    }
+    .fab:hover { transform: scale(1.1); box-shadow: 0 12px 32px rgba(124,58,237,0.6); }
+
+    /* Modal */
+    .modal-overlay {
+      position: fixed; inset: 0; z-index: 200;
+      background: rgba(0,0,0,0.7); backdrop-filter: blur(4px);
+      display: none; align-items: center; justify-content: center; padding: 1rem;
+    }
+    .modal-overlay.open { display: flex; }
+    .modal {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: 20px; padding: 1.75rem; width: 100%; max-width: 520px;
+      max-height: 90vh; overflow-y: auto;
+    }
+    .modal-title { font-size: 1.125rem; font-weight: 700; margin-bottom: 1.25rem; }
+    .form-group { margin-bottom: 1rem; }
+    .form-label { font-size: 0.8rem; color: var(--muted); font-weight: 500; margin-bottom: 0.375rem; display: block; }
+    .form-input {
+      width: 100%; background: var(--surface); border: 1px solid var(--border);
+      border-radius: 8px; padding: 0.625rem 0.875rem; color: var(--text);
+      font-size: 0.875rem; transition: border-color 0.2s;
+    }
+    .form-input:focus { outline: none; border-color: var(--accent); }
+    .form-select {
+      width: 100%; background: var(--surface); border: 1px solid var(--border);
+      border-radius: 8px; padding: 0.625rem 0.875rem; color: var(--text);
+      font-size: 0.875rem; cursor: pointer;
+    }
+    .form-select:focus { outline: none; border-color: var(--accent); }
+    .color-picker-row { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.375rem; }
+    .color-swatch {
+      width: 28px; height: 28px; border-radius: 50%; cursor: pointer;
+      border: 2px solid transparent; transition: all 0.15s;
+    }
+    .color-swatch.selected { border-color: white; transform: scale(1.2); }
+    .modal-actions { display: flex; gap: 0.75rem; justify-content: flex-end; margin-top: 1.5rem; }
+    .type-toggle { display: flex; gap: 0.5rem; margin-bottom: 1rem; }
+    .type-btn {
+      flex: 1; padding: 0.625rem; border-radius: 8px; border: 1px solid var(--border);
+      background: var(--surface); color: var(--muted); cursor: pointer; font-size: 0.875rem;
+      transition: all 0.2s; font-weight: 500;
+    }
+    .type-btn.active { background: var(--accent); color: white; border-color: var(--accent); }
+
+    /* AI section */
+    .ai-bubble {
+      background: linear-gradient(135deg, rgba(124,58,237,0.15), rgba(6,182,212,0.1));
+      border: 1px solid rgba(124,58,237,0.3);
+      border-radius: 12px; padding: 1rem; font-size: 0.875rem; line-height: 1.6;
+    }
+    .ai-input-row { display: flex; gap: 0.75rem; margin-top: 0.75rem; }
+    .ai-input {
+      flex: 1; background: var(--surface); border: 1px solid var(--border);
+      border-radius: 8px; padding: 0.5rem 0.875rem; color: var(--text); font-size: 0.875rem;
+    }
+    .ai-input:focus { outline: none; border-color: var(--accent); }
+
+    /* Search */
+    .search-bar {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: 12px; padding: 0.75rem 1rem;
+      display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1.5rem;
+    }
+    .search-bar input {
+      flex: 1; background: transparent; border: none; color: var(--text);
+      font-size: 1rem; outline: none;
+    }
+    .asset-card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 12px; padding: 1.25rem; cursor: pointer;
+      transition: all 0.2s;
+    }
+    .asset-card:hover { border-color: var(--accent); transform: translateY(-1px); }
+    .asset-card-header { display: flex; justify-content: space-between; align-items: flex-start; }
+    .asset-ticker { font-size: 1.125rem; font-weight: 700; }
+    .asset-name { font-size: 0.75rem; color: var(--muted); margin-top: 2px; }
+    .asset-price { font-size: 1.1rem; font-weight: 700; text-align: right; }
+    .asset-change { font-size: 0.75rem; text-align: right; }
+
+    /* Section header */
+    .section-header {
+      display: flex; justify-content: space-between; align-items: center;
+      margin-bottom: 1rem; margin-top: 1.5rem;
+    }
+    .section-title { font-size: 1rem; font-weight: 700; }
+    .section-subtitle { font-size: 0.8rem; color: var(--muted); margin-top: 2px; }
+
+    /* Chart container */
+    .chart-container { position: relative; height: 200px; }
+    .chart-container-lg { position: relative; height: 280px; }
+
+    /* Loading */
+    .spinner {
+      display: inline-block; width: 16px; height: 16px;
+      border: 2px solid var(--border); border-top-color: var(--accent);
+      border-radius: 50%; animation: spin 0.7s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Toast */
+    #toast {
+      position: fixed; bottom: 5rem; right: 1.5rem; z-index: 999;
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: 10px; padding: 0.75rem 1.25rem; font-size: 0.875rem;
+      opacity: 0; transform: translateY(8px); transition: all 0.3s;
+      pointer-events: none;
+    }
+    #toast.show { opacity: 1; transform: translateY(0); }
+    #toast.success { border-color: var(--green); color: var(--green); }
+    #toast.error { border-color: var(--red); color: var(--red); }
+
+    /* Detail panel */
+    .detail-panel {
+      position: fixed; top: 0; right: -100%; bottom: 0;
+      width: min(480px, 100vw); z-index: 150;
+      background: var(--card); border-left: 1px solid var(--border);
+      padding: 2rem 1.5rem; overflow-y: auto;
+      transition: right 0.3s ease;
+    }
+    .detail-panel.open { right: 0; }
+    .detail-overlay {
+      position: fixed; inset: 0; z-index: 149;
+      background: rgba(0,0,0,0.5);
+      display: none;
+    }
+    .detail-overlay.open { display: block; }
+
+    /* Movements list */
+    .movement-item {
+      display: flex; align-items: center; gap: 0.75rem;
+      padding: 0.625rem 0; border-bottom: 1px solid rgba(42,42,61,0.5);
+    }
+    .movement-icon {
+      width: 32px; height: 32px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center; font-size: 0.85rem;
+      flex-shrink: 0;
+    }
+    .movement-icon.in { background: rgba(16,185,129,0.15); color: var(--green); }
+    .movement-icon.out { background: rgba(239,68,68,0.15); color: var(--red); }
+    .movement-body { flex: 1; min-width: 0; }
+    .movement-desc { font-size: 0.85rem; font-weight: 500; }
+    .movement-date { font-size: 0.7rem; color: var(--muted); margin-top: 1px; }
+    .movement-amount { font-weight: 700; font-size: 0.9rem; }
+
+    /* Divider */
+    .divider { height: 1px; background: var(--border); margin: 1.5rem 0; }
+
+    /* Responsive adjustments */
+    @media (max-width: 640px) {
+      .nav-inner { padding: 0.75rem 1rem; }
+      .capital-badge { display: none; }
+      main { padding: 4.5rem 1rem 2rem; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ============================================================
+  NAVIGATION
+============================================================ -->
+<nav>
+  <div class="nav-inner">
+    <div class="nav-logo">💼 Bóveda</div>
+    <div class="nav-tabs">
+      <button class="nav-tab active" onclick="navigate('estado')">Mi Estado</button>
+      <button class="nav-tab" onclick="navigate('inversiones')">Inversiones</button>
+      <button class="nav-tab" onclick="navigate('search')">Search</button>
+    </div>
+    <div class="capital-badge">Capital: <span id="nav-capital">$0</span></div>
+  </div>
+</nav>
+
+<!-- ============================================================
+  MAIN CONTENT
+============================================================ -->
+<main>
+
+  <!-- ==================== MI ESTADO ==================== -->
+  <section id="page-estado" class="page active">
+
+    <!-- Top row: Capital + Wallet -->
+    <div class="grid-3" style="margin-bottom:1rem;">
+      <div class="card" style="border-color: rgba(6,182,212,0.4);">
+        <div class="card-title">Capital Neto Total</div>
+        <div class="card-value text-accent" id="capital-neto">$0</div>
+        <div style="font-size:0.75rem; color:var(--muted); margin-top:0.5rem;">Inversiones + Billetera</div>
+      </div>
+      <div class="card">
+        <div class="card-title">💰 Billetera</div>
+        <div class="card-value text-green" id="saldo-billetera">$0</div>
+        <div style="font-size:0.75rem; color:var(--muted); margin-top:0.5rem;">Dinero disponible</div>
+      </div>
+      <div class="card">
+        <div class="card-title">📈 Total Inversiones</div>
+        <div class="card-value" id="total-inv-display">$0</div>
+        <div style="font-size:0.75rem; color:var(--muted); margin-top:0.5rem;">Valor actual del portafolio</div>
+      </div>
+    </div>
+
+    <!-- Wallet Actions -->
+    <div class="card" style="margin-bottom:1rem;">
+      <div class="card-title">💸 Agregar Movimiento</div>
+      <div class="wallet-btns">
+        <select id="wallet-type" class="form-select" style="width:auto; min-width:120px;">
+          <option value="INGRESO">+ Ingreso</option>
+          <option value="GASTO">− Gasto</option>
+        </select>
+        <input type="number" id="wallet-amount" class="wallet-input" placeholder="Monto" min="0" step="0.01" />
+        <input type="text" id="wallet-desc" class="wallet-input" placeholder="Descripción (opcional)" />
+        <button class="btn btn-primary" onclick="addWalletMovement()">Registrar</button>
+      </div>
+    </div>
+
+    <!-- Charts row -->
+    <div class="grid-2" style="margin-bottom:1rem;">
+      <div class="card">
+        <div class="card-title">📊 Capital Histórico</div>
+        <div class="chart-container">
+          <canvas id="chart-capital"></canvas>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title">⚖️ Ingresos vs Gastos</div>
+        <div class="chart-container">
+          <canvas id="chart-ingvsgasto"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <div class="grid-2" style="margin-bottom:1rem;">
+      <div class="card">
+        <div class="card-title">🏆 Distribución del Portafolio</div>
+        <div class="chart-container">
+          <canvas id="chart-distrib"></canvas>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title">📈 Rendimiento de Inversiones</div>
+        <div class="chart-container">
+          <canvas id="chart-rendimiento"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- Recent movements -->
+    <div class="card" style="margin-bottom:1rem;">
+      <div class="section-header" style="margin-top:0; margin-bottom:0.75rem;">
+        <div>
+          <div class="section-title">Últimos Movimientos</div>
+          <div class="section-subtitle">Gastos hormiga y entradas</div>
+        </div>
+      </div>
+      <div id="movements-list">
+        <div style="color:var(--muted); font-size:0.875rem; padding:1rem 0;">Cargando...</div>
+      </div>
+    </div>
+
+    <!-- AI Recommendations -->
+    <div class="card">
+      <div class="card-title">🤖 Giga.IA — Recomendaciones</div>
+      <div class="ai-bubble" id="ai-response">
+        Hola, soy <strong>Giga.IA</strong>. Pregúntame sobre tus inversiones, el mercado, o cómo optimizar tu portafolio. 💡
+      </div>
+      <div class="ai-input-row">
+        <input type="text" id="ai-input" class="ai-input" placeholder="Ej: ¿Qué debo hacer con mis inversiones?" onkeydown="if(event.key==='Enter') sendAI()" />
+        <button class="btn btn-primary" onclick="sendAI()" id="ai-btn">Preguntar</button>
+      </div>
+    </div>
+
+  </section>
+
+  <!-- ==================== INVERSIONES ==================== -->
+  <section id="page-inversiones" class="page">
+
+    <div class="section-header" style="margin-top:0;">
+      <div>
+        <div class="section-title" style="font-size:1.25rem;">Mis Inversiones</div>
+        <div class="section-subtitle">Gestiona tu portafolio pasivo y activo</div>
+      </div>
+    </div>
+
+    <!-- Comparative chart -->
+    <div class="card" style="margin-bottom:1rem;">
+      <div class="card-title">📊 Comparativo de Rendimiento</div>
+      <div class="chart-container-lg">
+        <canvas id="chart-comparative"></canvas>
+      </div>
+    </div>
+
+    <!-- Pasivas -->
+    <div class="section-header">
+      <div>
+        <div class="section-title">🔒 Inversiones Pasivas</div>
+        <div class="section-subtitle">CDTs, cuentas de ahorro, depósitos a plazo</div>
+      </div>
+      <div style="font-size:0.8rem; color:var(--muted);" id="pasiva-total"></div>
+    </div>
+    <div id="inv-pasiva-list" style="display:flex; flex-direction:column; gap:0.625rem; margin-bottom:1.5rem;">
+      <div style="color:var(--muted); font-size:0.875rem; padding:0.5rem 0;">Cargando...</div>
+    </div>
+
+    <!-- Activas -->
+    <div class="section-header">
+      <div>
+        <div class="section-title">📈 Inversiones Activas</div>
+        <div class="section-subtitle">ETFs, acciones, activos de mercado</div>
+      </div>
+      <div style="font-size:0.8rem; color:var(--muted);" id="activa-total"></div>
+    </div>
+    <div id="inv-activa-list" style="display:flex; flex-direction:column; gap:0.625rem; margin-bottom:4rem;">
+      <div style="color:var(--muted); font-size:0.875rem; padding:0.5rem 0;">Cargando...</div>
+    </div>
+
+  </section>
+
+  <!-- ==================== SEARCH ==================== -->
+  <section id="page-search" class="page">
+
+    <div class="section-header" style="margin-top:0;">
+      <div>
+        <div class="section-title" style="font-size:1.25rem;">Directorio de Mercado</div>
+        <div class="section-subtitle">ETFs, acciones y activos destacados</div>
+      </div>
+    </div>
+
+    <div class="search-bar">
+      <span style="color:var(--muted);">🔍</span>
+      <input type="text" id="search-input" placeholder="Buscar ticker: SPY, QQQ, BTC-USD..." onkeydown="if(event.key==='Enter') searchAsset()" />
+      <button class="btn btn-primary" style="padding:0.375rem 0.875rem;" onclick="searchAsset()">Buscar</button>
+    </div>
+
+    <!-- Search result -->
+    <div id="search-result" style="margin-bottom:1.5rem; display:none;">
+      <div class="card" id="search-result-card">
+        <div class="asset-card-header">
+          <div>
+            <div class="asset-ticker" id="res-ticker">—</div>
+            <div class="asset-name" id="res-name">Buscando...</div>
+          </div>
+          <div>
+            <div class="asset-price" id="res-price">—</div>
+            <div class="asset-change" id="res-sma">SMA20: —</div>
+          </div>
+        </div>
+        <div style="margin-top:1rem; display:flex; gap:0.5rem; flex-wrap:wrap;">
+          <button class="btn btn-primary" onclick="addAssetToInversiones()">+ Agregar a Inversiones</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Featured assets -->
+    <div class="section-header" style="margin-top:0;">
+      <div class="section-title">⭐ Activos Destacados</div>
+    </div>
+    <div class="grid-3" id="featured-assets">
+      <!-- populated by JS -->
+    </div>
+
+  </section>
+
+</main>
+
+<!-- ============================================================
+  FAB (only on Inversiones page)
+============================================================ -->
+<button class="fab" id="fab-btn" onclick="openInvModal()" style="display:none;" aria-label="Nueva inversión">+</button>
+
+<!-- ============================================================
+  MODALS
+============================================================ -->
+
+<!-- New Investment Modal -->
+<div class="modal-overlay" id="modal-inv">
+  <div class="modal">
+    <div class="modal-title">➕ Nueva Inversión</div>
+
+    <div class="type-toggle">
+      <button class="type-btn active" id="tbtn-pasiva" onclick="selectInvType('PASIVA')">🔒 Pasiva</button>
+      <button class="type-btn" id="tbtn-activa" onclick="selectInvType('ACTIVA')">📈 Activa</button>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Nombre del activo</label>
+      <input type="text" id="inv-name" class="form-input" placeholder="Ej: DaFuturo, CDT Bancolombia, SPY..." />
+    </div>
+    <div class="form-group">
+      <label class="form-label">Monto invertido ($)</label>
+      <input type="number" id="inv-amount" class="form-input" placeholder="0.00" min="0" step="0.01" />
+    </div>
+    <div class="form-group">
+      <label class="form-label">Valor actual ($)</label>
+      <input type="number" id="inv-current" class="form-input" placeholder="0.00" min="0" step="0.01" />
+    </div>
+
+    <!-- Pasiva-specific -->
+    <div id="pasiva-fields">
+      <div class="form-group">
+        <label class="form-label">Duración / plazo</label>
+        <input type="text" id="inv-duration" class="form-input" placeholder="Ej: 90 días, indefinido..." />
+      </div>
+      <div class="form-group">
+        <label class="form-label">Liquidez</label>
+        <select id="inv-liquid" class="form-select">
+          <option value="liquid">✅ A la vista (líquido)</option>
+          <option value="locked">🔒 Bloqueado / Plazo fijo</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Saldo mínimo ($) — 0 si no aplica</label>
+        <input type="number" id="inv-minbal" class="form-input" placeholder="0.00" min="0" step="0.01" />
+      </div>
+    </div>
+
+    <!-- Activa-specific (hidden by default) -->
+    <div id="activa-fields" style="display:none;">
+      <div class="form-group">
+        <label class="form-label">Ticker de mercado (para actualizaciones)</label>
+        <input type="text" id="inv-ticker" class="form-input" placeholder="Ej: SPY, QQQ..." />
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Color identificador</label>
+      <div class="color-picker-row" id="color-picker">
+        <!-- swatches injected by JS -->
+      </div>
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeInvModal()">Cancelar</button>
+      <button class="btn btn-primary" onclick="saveInvestment()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Edit Investment Modal -->
+<div class="modal-overlay" id="modal-edit-inv">
+  <div class="modal">
+    <div class="modal-title">✏️ Editar Inversión</div>
+    <input type="hidden" id="edit-inv-id" />
+    <div class="form-group">
+      <label class="form-label">Nombre</label>
+      <input type="text" id="edit-inv-name" class="form-input" />
+    </div>
+    <div class="form-group">
+      <label class="form-label">Monto invertido ($)</label>
+      <input type="number" id="edit-inv-amount" class="form-input" min="0" step="0.01" />
+    </div>
+    <div class="form-group">
+      <label class="form-label">Valor actual ($)</label>
+      <input type="number" id="edit-inv-current" class="form-input" min="0" step="0.01" />
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal('modal-edit-inv')">Cancelar</button>
+      <button class="btn btn-primary" onclick="updateInvestment()">Actualizar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Investment Detail Panel -->
+<div class="detail-overlay" id="detail-overlay" onclick="closeDetail()"></div>
+<div class="detail-panel" id="detail-panel">
+  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.5rem;">
+    <div class="section-title" id="detail-title">Detalle</div>
+    <button class="btn btn-ghost" style="padding:0.375rem 0.75rem;" onclick="closeDetail()">✕</button>
+  </div>
+  <div id="detail-content"></div>
+  <div class="chart-container-lg" style="margin-top:1rem;">
+    <canvas id="chart-detail"></canvas>
+  </div>
+</div>
+
+<!-- Toast -->
+<div id="toast"></div>
+
+<!-- ============================================================
+  JAVASCRIPT
+============================================================ -->
+<script>
+// ==========================================
+// CONFIG
+// ==========================================
+// Detect backend URL: if running locally use localhost, else same origin
+const API_BASE = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+  ? 'http://localhost:8000'
+  : '';  // Same origin in production (Azure Static Web Apps with API routing)
+
+const COLORS = ['#7c3aed','#06b6d4','#10b981','#f59e0b','#ef4444','#ec4899','#8b5cf6','#14b8a6','#f97316','#a3e635'];
+let selectedColor = COLORS[0];
+
+// In-memory storage (supplemented by backend)
+let investments = [];
+let walletData = { saldo: 0, movimientos: [] };
+let capitalNeto = 0;
+// Per-investment extra metadata stored in localStorage
+function getLocalMeta() {
+  try { return JSON.parse(localStorage.getItem('inv_meta') || '{}'); } catch { return {}; }
+}
+function setLocalMeta(meta) {
+  localStorage.setItem('inv_meta', JSON.stringify(meta));
+}
+
+// Charts
+let charts = {};
+
+// ==========================================
+// NAVIGATION
+// ==========================================
+function navigate(page) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('page-' + page).classList.add('active');
+  document.querySelector(`.nav-tab[onclick="navigate('${page}')"]`).classList.add('active');
+
+  const fab = document.getElementById('fab-btn');
+  fab.style.display = page === 'inversiones' ? 'flex' : 'none';
+
+  if (page === 'estado') refreshEstado();
+  if (page === 'inversiones') refreshInversiones();
+  if (page === 'search') initSearch();
+}
+
+// ==========================================
+// TOAST
+// ==========================================
+function showToast(msg, type = 'success') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'show ' + type;
+  setTimeout(() => { t.className = ''; }, 3000);
+}
+
+// ==========================================
+// API HELPERS
+// ==========================================
+async function apiFetch(path, options = {}) {
+  try {
+    const res = await fetch(API_BASE + path, {
+      headers: { 'Content-Type': 'application/json' },
+      ...options
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || `Error del servidor (${res.status})`);
+    }
+    return await res.json();
+  } catch (e) {
+    if (e.name === 'TypeError') throw new Error('No se pudo conectar al servidor. Por favor, intenta más tarde.');
+    throw e;
+  }
+}
+
+// ==========================================
+// FORMAT CURRENCY
+// ==========================================
+function fmt(n) {
+  if (n == null) return '$0';
+  return '$' + Number(n).toLocaleString('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+}
+function fmtDate(d) {
+  if (!d) return '';
+  return new Date(d).toLocaleDateString('es-CO', { day:'2-digit', month:'short' });
+}
+
+// ==========================================
+// MI ESTADO — DATA LOADING
+// ==========================================
+async function refreshEstado() {
+  try {
+    // Load capital neto
+    const cn = await apiFetch('/api/capital-neto');
+    capitalNeto = cn.capital_neto_total;
+    document.getElementById('capital-neto').textContent = fmt(cn.capital_neto_total);
+    document.getElementById('saldo-billetera').textContent = fmt(cn.desglose.billetera);
+    document.getElementById('total-inv-display').textContent = fmt(cn.desglose.inversiones);
+    document.getElementById('nav-capital').textContent = fmt(cn.capital_neto_total);
+
+    // Load wallet movements
+    const wData = await apiFetch('/api/wallet');
+    walletData = { saldo: wData.saldo_billetera, movimientos: wData.movimientos || [] };
+    renderMovements(walletData.movimientos);
+
+    // Load investments for charts
+    investments = await apiFetch('/api/investments');
+    renderEstadoCharts(cn, walletData.movimientos, investments);
+  } catch (e) {
+    showToast('Error cargando datos: ' + e.message, 'error');
+    renderEstadoChartsEmpty();
+  }
+}
+
+function renderMovements(movs) {
+  const el = document.getElementById('movements-list');
+  if (!movs || movs.length === 0) {
+    el.innerHTML = '<div style="color:var(--muted);font-size:0.875rem;padding:0.75rem 0;">Sin movimientos registrados.</div>';
+    return;
+  }
+  const recent = [...movs].slice(0, 10);
+  el.innerHTML = recent.map(m => `
+    <div class="movement-item">
+      <div class="movement-icon ${m.type === 'INGRESO' ? 'in' : 'out'}">${m.type === 'INGRESO' ? '↑' : '↓'}</div>
+      <div class="movement-body">
+        <div class="movement-desc">${m.description || 'Sin descripción'}</div>
+        <div class="movement-date">${fmtDate(m.date)}</div>
+      </div>
+      <div class="movement-amount ${m.type === 'INGRESO' ? 'text-green' : 'text-red'}">
+        ${m.type === 'INGRESO' ? '+' : '-'}${fmt(m.amount)}
+      </div>
+    </div>
+  `).join('');
+}
+
+function renderEstadoCharts(cn, movs, invs) {
+  // Capital chart — simulate 7 day history from movements
+  const movsByDay = {};
+  let running = 0;
+  const sortedMovs = [...(movs||[])].sort((a,b) => new Date(a.date)-new Date(b.date));
+  sortedMovs.forEach(m => {
+    const day = (m.date || '').split('T')[0];
+    if (!movsByDay[day]) movsByDay[day] = 0;
+    movsByDay[day] += m.type === 'INGRESO' ? m.amount : -m.amount;
+  });
+  const invTotal = invs.reduce((s,i) => s+i.current_value, 0);
+  const days = Object.keys(movsByDay).sort().slice(-7);
+  const capitalHistory = days.map(d => {
+    running += movsByDay[d];
+    return running + invTotal;
+  });
+  if (capitalHistory.length === 0) capitalHistory.push(cn.capital_neto_total);
+  renderLineChart('chart-capital', days.length ? days : ['Hoy'], capitalHistory, '#06b6d4');
+
+  // Income vs expense bar chart
+  let totalIncome = 0, totalExpense = 0;
+  (movs||[]).forEach(m => {
+    if (m.type === 'INGRESO') totalIncome += m.amount;
+    else totalExpense += m.amount;
+  });
+  renderBarChart('chart-ingvsgasto', ['Ingresos', 'Gastos'], [totalIncome, totalExpense], ['#10b981','#ef4444']);
+
+  // Distribution doughnut
+  const labels = invs.map(i => i.asset_name);
+  const values = invs.map(i => i.current_value);
+  const meta = getLocalMeta();
+  const colors = invs.map(i => (meta[i.id] || {}).color || COLORS[i.id % COLORS.length]);
+  if (labels.length === 0) { labels.push('Billetera'); values.push(cn.desglose.billetera); colors.push('#7c3aed'); }
+  renderDoughnutChart('chart-distrib', labels, values, colors);
+
+  // Rendimiento bar chart
+  const retLabels = invs.map(i => i.asset_name.substring(0,12));
+  const retValues = invs.map(i => parseFloat(((i.current_value - i.invested_amount) / Math.max(i.invested_amount,1) * 100).toFixed(2)));
+  const retColors = retValues.map(v => v >= 0 ? '#10b981' : '#ef4444');
+  renderBarChart('chart-rendimiento', retLabels, retValues, retColors, '%');
+}
+
+function renderEstadoChartsEmpty() {
+  renderLineChart('chart-capital', ['Hoy'], [0], '#06b6d4');
+  renderBarChart('chart-ingvsgasto', ['Ingresos', 'Gastos'], [0, 0], ['#10b981','#ef4444']);
+  renderDoughnutChart('chart-distrib', ['Sin datos'], [1], ['#2a2a3d']);
+  renderBarChart('chart-rendimiento', ['Sin datos'], [0], ['#2a2a3d']);
+}
+
+// ==========================================
+// WALLET ACTIONS
+// ==========================================
+async function addWalletMovement() {
+  const type = document.getElementById('wallet-type').value;
+  const amount = parseFloat(document.getElementById('wallet-amount').value);
+  const desc = document.getElementById('wallet-desc').value.trim() || 'Movimiento General';
+
+  if (!amount || amount <= 0) { showToast('Ingresa un monto válido', 'error'); return; }
+
+  try {
+    await apiFetch('/api/wallet', {
+      method: 'POST',
+      body: JSON.stringify({ type, description: desc, amount })
+    });
+    document.getElementById('wallet-amount').value = '';
+    document.getElementById('wallet-desc').value = '';
+    showToast(`${type === 'INGRESO' ? '+' : '-'}${fmt(amount)} registrado ✓`);
+    refreshEstado();
+  } catch (e) {
+    showToast('Error: ' + e.message, 'error');
+  }
+}
+
+// ==========================================
+// AI CHAT
+// ==========================================
+async function sendAI() {
+  const input = document.getElementById('ai-input');
+  const btn = document.getElementById('ai-btn');
+  const msg = input.value.trim();
+  if (!msg) return;
+
+  const resp = document.getElementById('ai-response');
+  resp.innerHTML = '<span class="spinner"></span> Pensando...';
+  btn.disabled = true;
+  input.value = '';
+
+  try {
+    const data = await apiFetch('/api/chat', {
+      method: 'POST',
+      body: JSON.stringify({ message: msg })
+    });
+    resp.innerHTML = data.response.replace(/\n/g, '<br>');
+  } catch (e) {
+    resp.innerHTML = '⚠️ ' + e.message;
+  }
+  btn.disabled = false;
+}
+
+// ==========================================
+// INVERSIONES — DATA
+// ==========================================
+async function refreshInversiones() {
+  try {
+    investments = await apiFetch('/api/investments');
+    renderInvLists(investments);
+    renderComparativeChart(investments);
+  } catch (e) {
+    showToast('Error cargando inversiones: ' + e.message, 'error');
+    document.getElementById('inv-pasiva-list').innerHTML = '<div style="color:var(--red);font-size:0.875rem;">Error conectando al backend.</div>';
+    document.getElementById('inv-activa-list').innerHTML = '';
+  }
+}
+
+function renderInvLists(invs) {
+  const pasivas = invs.filter(i => i.type === 'PASIVA');
+  const activas = invs.filter(i => i.type === 'ACTIVA');
+  const meta = getLocalMeta();
+
+  const makeCard = (inv) => {
+    const m = meta[inv.id] || {};
+    const color = m.color || COLORS[inv.id % COLORS.length];
+    const ret = inv.invested_amount > 0 ? ((inv.current_value - inv.invested_amount) / inv.invested_amount * 100) : 0;
+    const retStr = (ret >= 0 ? '+' : '') + ret.toFixed(2) + '%';
+    const retClass = ret >= 0 ? 'text-green' : 'text-red';
+    const liquidBadge = m.liquid === 'liquid'
+      ? '<span class="liquid-badge">A la vista</span>'
+      : m.liquid === 'locked' ? '<span class="locked-badge">Bloqueado</span>' : '';
+    return `
+      <div class="inv-card" onclick="openDetail(${inv.id})">
+        <div class="inv-color-dot" style="background:${color};box-shadow:0 0 8px ${color}55;"></div>
+        <div class="inv-card-body">
+          <div class="inv-card-name">${inv.asset_name}${liquidBadge}</div>
+          <div class="inv-card-sub">${inv.type} · Invertido: ${fmt(inv.invested_amount)}${m.duration ? ' · ' + m.duration : ''}</div>
+        </div>
+        <div class="inv-card-value">
+          <div class="inv-card-amount">${fmt(inv.current_value)}</div>
+          <div class="inv-card-return ${retClass}">${retStr}</div>
+        </div>
+        <div style="display:flex;gap:0.375rem;margin-left:0.5rem;">
+          <button class="btn-icon btn-icon-green" onclick="event.stopPropagation();openEditModal(${inv.id})" title="Editar">✏️</button>
+          <button class="btn-icon btn-icon-red" onclick="event.stopPropagation();deleteInvestment(${inv.id})" title="Eliminar">🗑️</button>
+        </div>
+      </div>`;
+  };
+
+  const pasivaEl = document.getElementById('inv-pasiva-list');
+  if (pasivas.length === 0) {
+    pasivaEl.innerHTML = '<div style="color:var(--muted);font-size:0.875rem;padding:0.5rem 0;">Sin inversiones pasivas. Usa el + para agregar.</div>';
+  } else {
+    pasivaEl.innerHTML = pasivas.map(makeCard).join('');
+    document.getElementById('pasiva-total').textContent = 'Total: ' + fmt(pasivas.reduce((s,i)=>s+i.current_value,0));
+  }
+
+  const activaEl = document.getElementById('inv-activa-list');
+  if (activas.length === 0) {
+    activaEl.innerHTML = '<div style="color:var(--muted);font-size:0.875rem;padding:0.5rem 0;">Sin inversiones activas. Usa el + para agregar.</div>';
+  } else {
+    activaEl.innerHTML = activas.map(makeCard).join('');
+    document.getElementById('activa-total').textContent = 'Total: ' + fmt(activas.reduce((s,i)=>s+i.current_value,0));
+  }
+}
+
+function renderComparativeChart(invs) {
+  const meta = getLocalMeta();
+  const labels = invs.map(i => i.asset_name.substring(0,12));
+  const invested = invs.map(i => i.invested_amount);
+  const current = invs.map(i => i.current_value);
+  const colors = invs.map(i => (meta[i.id]||{}).color || COLORS[i.id % COLORS.length]);
+
+  destroyChart('chart-comparative');
+  const ctx = document.getElementById('chart-comparative').getContext('2d');
+  charts['chart-comparative'] = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: labels.length ? labels : ['Sin datos'],
+      datasets: [
+        {
+          label: 'Invertido',
+          data: invested.length ? invested : [0],
+          backgroundColor: colors.map(c => c + '55'),
+          borderColor: colors,
+          borderWidth: 2,
+        },
+        {
+          label: 'Valor actual',
+          data: current.length ? current : [0],
+          backgroundColor: colors.map(c => c + 'aa'),
+          borderColor: colors,
+          borderWidth: 2,
+        }
+      ]
+    },
+    options: chartOptions()
+  });
+}
+
+// ==========================================
+// INVESTMENT MODAL
+// ==========================================
+let newInvType = 'PASIVA';
+
+function openInvModal() {
+  newInvType = 'PASIVA';
+  document.getElementById('tbtn-pasiva').classList.add('active');
+  document.getElementById('tbtn-activa').classList.remove('active');
+  document.getElementById('pasiva-fields').style.display = '';
+  document.getElementById('activa-fields').style.display = 'none';
+  document.getElementById('inv-name').value = '';
+  document.getElementById('inv-amount').value = '';
+  document.getElementById('inv-current').value = '';
+  document.getElementById('inv-duration').value = '';
+  document.getElementById('inv-ticker').value = '';
+  selectedColor = COLORS[0];
+  renderColorPicker();
+  document.getElementById('modal-inv').classList.add('open');
+}
+
+function closeInvModal() { document.getElementById('modal-inv').classList.remove('open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+
+function selectInvType(type) {
+  newInvType = type;
+  document.getElementById('tbtn-pasiva').classList.toggle('active', type === 'PASIVA');
+  document.getElementById('tbtn-activa').classList.toggle('active', type === 'ACTIVA');
+  document.getElementById('pasiva-fields').style.display = type === 'PASIVA' ? '' : 'none';
+  document.getElementById('activa-fields').style.display = type === 'ACTIVA' ? '' : 'none';
+}
+
+function renderColorPicker() {
+  const el = document.getElementById('color-picker');
+  el.innerHTML = COLORS.map(c => `
+    <div class="color-swatch${c === selectedColor ? ' selected' : ''}"
+         style="background:${c}"
+         onclick="selectColor('${c}')"></div>
+  `).join('');
+}
+
+function selectColor(c) {
+  selectedColor = c;
+  renderColorPicker();
+}
+
+async function saveInvestment() {
+  const name = document.getElementById('inv-name').value.trim();
+  const amount = parseFloat(document.getElementById('inv-amount').value);
+  const current = parseFloat(document.getElementById('inv-current').value);
+
+  if (!name) { showToast('Ingresa un nombre', 'error'); return; }
+  if (isNaN(amount) || amount < 0) { showToast('Ingresa el monto invertido', 'error'); return; }
+  if (isNaN(current) || current < 0) { showToast('Ingresa el valor actual', 'error'); return; }
+
+  try {
+    const newInv = await apiFetch('/api/investments', {
+      method: 'POST',
+      body: JSON.stringify({ type: newInvType, asset_name: name, invested_amount: amount, current_value: current })
+    });
+    // Save extra metadata locally
+    const meta = getLocalMeta();
+    const id = newInv.data?.id;
+    if (id) {
+      meta[id] = {
+        color: selectedColor,
+        liquid: document.getElementById('inv-liquid').value,
+        duration: document.getElementById('inv-duration').value.trim(),
+        ticker: document.getElementById('inv-ticker').value.trim()
+      };
+      setLocalMeta(meta);
+    }
+    closeInvModal();
+    showToast('Inversión creada ✓');
+    refreshInversiones();
+  } catch (e) {
+    showToast('Error: ' + e.message, 'error');
+  }
+}
+
+// ==========================================
+// EDIT INVESTMENT
+// ==========================================
+function openEditModal(id) {
+  const inv = investments.find(i => i.id === id);
+  if (!inv) return;
+  document.getElementById('edit-inv-id').value = id;
+  document.getElementById('edit-inv-name').value = inv.asset_name;
+  document.getElementById('edit-inv-amount').value = inv.invested_amount;
+  document.getElementById('edit-inv-current').value = inv.current_value;
+  document.getElementById('modal-edit-inv').classList.add('open');
+}
+
+async function updateInvestment() {
+  const id = parseInt(document.getElementById('edit-inv-id').value);
+  const name = document.getElementById('edit-inv-name').value.trim();
+  const amount = parseFloat(document.getElementById('edit-inv-amount').value);
+  const current = parseFloat(document.getElementById('edit-inv-current').value);
+  if (!name || isNaN(amount) || isNaN(current)) { showToast('Completa todos los campos', 'error'); return; }
+
+  const inv = investments.find(i => i.id === id);
+  if (!inv) return;
+
+  try {
+    // Delete + re-create to simulate update (backend has no PUT endpoint).
+    // We save the original first so we can restore it if the POST fails.
+    const original = { ...inv };
+    await apiFetch('/api/investments/' + id, { method: 'DELETE' });
+    let newInv;
+    try {
+      newInv = await apiFetch('/api/investments', {
+        method: 'POST',
+        body: JSON.stringify({ type: original.type, asset_name: name, invested_amount: amount, current_value: current })
+      });
+    } catch (postErr) {
+      // Restore original if POST fails
+      await apiFetch('/api/investments', {
+        method: 'POST',
+        body: JSON.stringify({ type: original.type, asset_name: original.asset_name, invested_amount: original.invested_amount, current_value: original.current_value })
+      }).catch(() => {});
+      throw postErr;
+    }
+    // Transfer metadata
+    const meta = getLocalMeta();
+    const newId = newInv.data?.id;
+    if (meta[id] && newId) { meta[newId] = meta[id]; delete meta[id]; setLocalMeta(meta); }
+    closeModal('modal-edit-inv');
+    showToast('Inversión actualizada ✓');
+    refreshInversiones();
+  } catch (e) {
+    showToast('Error: ' + e.message, 'error');
+  }
+}
+
+async function deleteInvestment(id) {
+  if (!confirm('¿Eliminar esta inversión?')) return;
+  try {
+    await apiFetch('/api/investments/' + id, { method: 'DELETE' });
+    showToast('Inversión eliminada');
+    refreshInversiones();
+  } catch (e) {
+    showToast('Error: ' + e.message, 'error');
+  }
+}
+
+// ==========================================
+// DETAIL PANEL
+// ==========================================
+function openDetail(id) {
+  const inv = investments.find(i => i.id === id);
+  if (!inv) return;
+  const meta = getLocalMeta();
+  const m = meta[id] || {};
+  const color = m.color || COLORS[id % COLORS.length];
+  const ret = inv.invested_amount > 0 ? ((inv.current_value - inv.invested_amount) / inv.invested_amount * 100) : 0;
+
+  document.getElementById('detail-title').textContent = inv.asset_name;
+  document.getElementById('detail-content').innerHTML = `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;margin-bottom:1rem;">
+      <div class="card" style="padding:1rem;">
+        <div class="card-title">Invertido</div>
+        <div style="font-size:1.25rem;font-weight:700;">${fmt(inv.invested_amount)}</div>
+      </div>
+      <div class="card" style="padding:1rem;">
+        <div class="card-title">Valor Actual</div>
+        <div style="font-size:1.25rem;font-weight:700;color:${color};">${fmt(inv.current_value)}</div>
+      </div>
+    </div>
+    <div class="card" style="padding:1rem;margin-bottom:1rem;">
+      <div class="card-title">Rendimiento Total</div>
+      <div style="font-size:1.5rem;font-weight:700;color:${ret>=0?'var(--green)':'var(--red)'};">${(ret>=0?'+':'')+ret.toFixed(2)}%</div>
+      <div style="font-size:0.8rem;color:var(--muted);margin-top:4px;">Ganancia/Pérdida: ${fmt(inv.current_value - inv.invested_amount)}</div>
+    </div>
+    <div style="font-size:0.8rem;color:var(--muted);line-height:1.8;">
+      <div>Tipo: <span style="color:var(--text);">${inv.type}</span></div>
+      ${m.duration ? `<div>Plazo: <span style="color:var(--text);">${m.duration}</span></div>` : ''}
+      ${m.liquid ? `<div>Liquidez: <span style="color:var(--text);">${m.liquid==='liquid'?'A la vista':'Bloqueado'}</span></div>` : ''}
+      ${m.ticker ? `<div>Ticker: <span style="color:var(--text);">${m.ticker}</span></div>` : ''}
+    </div>
+    <div class="card-title" style="margin-top:1rem;">Evolución (simulada)</div>
+  `;
+
+  // Simulate 6-month history: linear interpolation from invested_amount to current_value
+  // with ±1% random variance per month to approximate realistic price movement.
+  const months = ['Ago','Sep','Oct','Nov','Dic','Ene','Feb'];
+  const base = inv.invested_amount;
+  const simData = months.map((_,i) => {
+    const progress = i / (months.length-1);
+    return parseFloat((base + (inv.current_value - base) * progress + (Math.random()-0.5)*base*0.02).toFixed(2));
+  });
+  simData[simData.length-1] = inv.current_value;
+
+  destroyChart('chart-detail');
+  const ctx = document.getElementById('chart-detail').getContext('2d');
+  charts['chart-detail'] = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: months,
+      datasets: [{
+        label: inv.asset_name,
+        data: simData,
+        borderColor: color,
+        backgroundColor: color + '22',
+        tension: 0.4,
+        fill: true,
+        pointRadius: 4,
+        pointBackgroundColor: color,
+      }]
+    },
+    options: chartOptions()
+  });
+
+  document.getElementById('detail-panel').classList.add('open');
+  document.getElementById('detail-overlay').classList.add('open');
+}
+
+function closeDetail() {
+  document.getElementById('detail-panel').classList.remove('open');
+  document.getElementById('detail-overlay').classList.remove('open');
+}
+
+// ==========================================
+// SEARCH MODULE
+// ==========================================
+const FEATURED = [
+  { ticker: 'SPY', name: 'S&P 500 ETF' },
+  { ticker: 'QQQ', name: 'Nasdaq 100 ETF' },
+  { ticker: 'VTI', name: 'Total Market ETF' },
+  { ticker: 'GLD', name: 'Gold ETF' },
+  { ticker: 'BRK-B', name: 'Berkshire Hathaway B' },
+  { ticker: 'AAPL', name: 'Apple Inc.' },
+  { ticker: 'MSFT', name: 'Microsoft Corp.' },
+  { ticker: 'NVDA', name: 'NVIDIA Corp.' },
+  { ticker: 'BTC-USD', name: 'Bitcoin USD' },
+];
+
+let searchResultData = null;
+
+async function initSearch() {
+  const el = document.getElementById('featured-assets');
+  el.innerHTML = FEATURED.map(a => `
+    <div class="asset-card" onclick="loadAsset('${a.ticker}', '${a.name}')">
+      <div class="asset-card-header">
+        <div>
+          <div class="asset-ticker">${a.ticker}</div>
+          <div class="asset-name">${a.name}</div>
+        </div>
+        <div id="price-${a.ticker}" style="color:var(--muted);font-size:0.75rem;"><span class="spinner"></span></div>
+      </div>
+    </div>
+  `).join('');
+
+  // Load prices in background
+  FEATURED.forEach(a => {
+    apiFetch('/api/asset/' + a.ticker).then(data => {
+      const el = document.getElementById('price-' + a.ticker);
+      if (el) {
+        const trend = data.real_price > data.sma_20 ? 'text-green' : 'text-red';
+        const icon = data.real_price > data.sma_20 ? '▲' : '▼';
+        el.innerHTML = `<span class="${trend}">${icon} $${data.real_price}</span>`;
+      }
+    }).catch(() => {
+      const el = document.getElementById('price-' + a.ticker);
+      if (el) el.innerHTML = '<span style="color:var(--muted);">N/A</span>';
+    });
+  });
+}
+
+async function loadAsset(ticker, name) {
+  document.getElementById('search-input').value = ticker;
+  await searchAsset(ticker, name);
+  document.getElementById('search-result').scrollIntoView({ behavior: 'smooth' });
+}
+
+async function searchAsset(tickerOverride, nameOverride) {
+  const ticker = (tickerOverride || document.getElementById('search-input').value.trim()).toUpperCase();
+  if (!ticker) { showToast('Ingresa un ticker', 'error'); return; }
+
+  document.getElementById('search-result').style.display = 'block';
+  document.getElementById('res-ticker').textContent = ticker;
+  document.getElementById('res-name').textContent = nameOverride || 'Cargando...';
+  document.getElementById('res-price').textContent = '...';
+  document.getElementById('res-sma').textContent = 'SMA20: ...';
+
+  try {
+    const data = await apiFetch('/api/asset/' + ticker);
+    searchResultData = { ...data, name: nameOverride || ticker };
+    const trend = data.real_price > data.sma_20 ? 'text-green' : 'text-red';
+    document.getElementById('res-name').textContent = nameOverride || ticker;
+    document.getElementById('res-price').innerHTML = `<span class="${trend}">$${data.real_price}</span>`;
+    document.getElementById('res-sma').innerHTML = `SMA20: $${data.sma_20} ${data.real_price > data.sma_20 ? '📈 Por encima' : '📉 Por debajo'}`;
+  } catch (e) {
+    document.getElementById('res-name').textContent = 'Error: ' + e.message;
+    document.getElementById('res-price').textContent = '—';
+    searchResultData = null;
+  }
+}
+
+function addAssetToInversiones() {
+  if (!searchResultData) { showToast('Primero busca un activo', 'error'); return; }
+  // Pre-fill the investment modal and navigate
+  navigate('inversiones');
+  openInvModal();
+  selectInvType('ACTIVA');
+  document.getElementById('inv-name').value = searchResultData.asset || '';
+  document.getElementById('inv-current').value = searchResultData.real_price || '';
+  document.getElementById('inv-ticker').value = searchResultData.asset || '';
+  showToast('Activo pre-cargado en el formulario ✓');
+}
+
+// ==========================================
+// CHART HELPERS
+// ==========================================
+const CHART_DEFAULTS = {
+  color: '#e2e8f0',
+  borderColor: '#2a2a3d',
+  font: { family: 'Segoe UI, system-ui, sans-serif', size: 11 }
+};
+
+function chartOptions(suffix = '') {
+  return {
+    responsive: true, maintainAspectRatio: false,
+    plugins: {
+      legend: { labels: { color: '#64748b', font: CHART_DEFAULTS.font, boxWidth: 12 } },
+      tooltip: {
+        backgroundColor: '#1a1a26', borderColor: '#2a2a3d', borderWidth: 1,
+        titleColor: '#e2e8f0', bodyColor: '#94a3b8',
+        callbacks: suffix ? { label: ctx => ctx.parsed.y + suffix } : {}
+      }
+    },
+    scales: {
+      x: { ticks: { color: '#64748b', font: CHART_DEFAULTS.font }, grid: { color: '#2a2a3d' } },
+      y: { ticks: { color: '#64748b', font: CHART_DEFAULTS.font, callback: v => suffix ? v+suffix : fmt(v) }, grid: { color: '#2a2a3d' } }
+    }
+  };
+}
+
+function destroyChart(id) {
+  if (charts[id]) { charts[id].destroy(); delete charts[id]; }
+}
+
+function renderLineChart(id, labels, data, color) {
+  destroyChart(id);
+  const ctx = document.getElementById(id).getContext('2d');
+  charts[id] = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [{
+        label: 'Capital',
+        data,
+        borderColor: color,
+        backgroundColor: color + '22',
+        tension: 0.4,
+        fill: true,
+        pointRadius: 3,
+        pointBackgroundColor: color,
+      }]
+    },
+    options: chartOptions()
+  });
+}
+
+function renderBarChart(id, labels, data, colors, suffix = '') {
+  destroyChart(id);
+  const ctx = document.getElementById(id).getContext('2d');
+  charts[id] = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{
+        label: '',
+        data,
+        backgroundColor: Array.isArray(colors) ? colors.map(c => c + 'aa') : colors + 'aa',
+        borderColor: colors,
+        borderWidth: 2,
+        borderRadius: 6,
+      }]
+    },
+    options: { ...chartOptions(suffix), plugins: { ...chartOptions(suffix).plugins, legend: { display: false } } }
+  });
+}
+
+function renderDoughnutChart(id, labels, data, colors) {
+  destroyChart(id);
+  const ctx = document.getElementById(id).getContext('2d');
+  charts[id] = new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+      labels,
+      datasets: [{
+        data,
+        backgroundColor: colors.map(c => c + 'cc'),
+        borderColor: colors,
+        borderWidth: 2,
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { position: 'right', labels: { color: '#64748b', font: CHART_DEFAULTS.font, boxWidth: 12 } },
+        tooltip: { backgroundColor: '#1a1a26', borderColor: '#2a2a3d', borderWidth: 1, titleColor: '#e2e8f0', bodyColor: '#94a3b8' }
+      }
+    }
+  });
+}
+
+// ==========================================
+// INIT
+// ==========================================
+document.addEventListener('DOMContentLoaded', () => {
+  // Build color picker
+  renderColorPicker();
+  // Load initial page
+  refreshEstado();
+  // Close modals on overlay click
+  document.getElementById('modal-inv').addEventListener('click', function(e) {
+    if (e.target === this) closeInvModal();
+  });
+  document.getElementById('modal-edit-inv').addEventListener('click', function(e) {
+    if (e.target === this) closeModal('modal-edit-inv');
+  });
+});
+</script>
+</body>
+</html>
