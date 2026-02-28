@@ -37,6 +37,33 @@ interface Investment {
   history: { date: string, value: number }[];
 }
 
+interface MarketAsset {
+  symbol: string;
+  name: string;
+  type: "ETF" | "STOCK";
+  description: string;
+  suggestedColor: string;
+  sector: string;
+}
+
+const MARKET_CATALOG: MarketAsset[] = [
+  { symbol: "SPY", name: "S&P 500 ETF (SPDR)", type: "ETF", description: "Replica los 500 mayores de EEUU. Diversificación máxima.", suggestedColor: "#00f0ff", sector: "Índice" },
+  { symbol: "QQQ", name: "NASDAQ 100 (Invesco)", type: "ETF", description: "Las 100 más grandes tecnológicas del NASDAQ.", suggestedColor: "#7000ff", sector: "Tecnología" },
+  { symbol: "VTI", name: "Total Market (Vanguard)", type: "ETF", description: "Todo el mercado accionario americano.", suggestedColor: "#00ffaa", sector: "Índice" },
+  { symbol: "ARKK", name: "ARK Innovation ETF", type: "ETF", description: "Empresas de disrupción e innovación.", suggestedColor: "#ff6600", sector: "Innovación" },
+  { symbol: "GLD", name: "Gold ETF (SPDR)", type: "ETF", description: "Respaldado por oro físico. Refugio de valor.", suggestedColor: "#ffd700", sector: "Materias Primas" },
+  { symbol: "IBIT", name: "Bitcoin ETF (iShares)", type: "ETF", description: "Exposición a Bitcoin sin custodiar. BlackRock.", suggestedColor: "#f7931a", sector: "Cripto" },
+  { symbol: "VWO", name: "Emerging Markets (Vanguard)", type: "ETF", description: "China, India, Brasil, Corea y más.", suggestedColor: "#ff4488", sector: "Global" },
+  { symbol: "AAPL", name: "Apple Inc.", type: "STOCK", description: "iPhone, Mac, servicios de suscripción.", suggestedColor: "#aaaaaa", sector: "Tecnología" },
+  { symbol: "MSFT", name: "Microsoft Corp.", type: "STOCK", description: "Azure, IA con OpenAI, Office 365.", suggestedColor: "#00a4ef", sector: "Tecnología" },
+  { symbol: "GOOGL", name: "Alphabet (Google)", type: "STOCK", description: "Ads, Gemini AI, Google Cloud.", suggestedColor: "#fbbc04", sector: "Tecnología" },
+  { symbol: "NVDA", name: "NVIDIA Corp.", type: "STOCK", description: "GPUs para IA, Data Centers, Gaming.", suggestedColor: "#76b900", sector: "Semiconductores" },
+  { symbol: "AMZN", name: "Amazon.com Inc.", type: "STOCK", description: "E-commerce #1, AWS cloud líder.", suggestedColor: "#ff9900", sector: "Tecnología" },
+  { symbol: "TSLA", name: "Tesla Inc.", type: "STOCK", description: "Vehículos eléctricos, Robotaxis, IA.", suggestedColor: "#e82127", sector: "Automoción" },
+  { symbol: "META", name: "Meta Platforms", type: "STOCK", description: "Facebook, Instagram, WhatsApp, Llama AI.", suggestedColor: "#0866ff", sector: "Redes Sociales" },
+  { symbol: "BRK.B", name: "Berkshire Hathaway B", type: "STOCK", description: "El portafolio de Warren Buffett.", suggestedColor: "#c8a96e", sector: "Holding" },
+];
+
 export default function NexusWallstreetSaaS() {
   // ==========================================
   // 🧭 2. ESTADOS GLOBALES DE LA APLICACIÓN
@@ -75,6 +102,13 @@ export default function NexusWallstreetSaaS() {
   const [newInvLiquid, setNewInvLiquid] = useState(true);
   const [newInvMinBalance, setNewInvMinBalance] = useState("0");
   const [expandedInvId, setExpandedInvId] = useState<string | null>(null);
+
+  // Search module states
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchFilter, setSearchFilter] = useState<"ALL" | "ETF" | "STOCK">("ALL");
+
+  // Investment custom update state (per-investment input)
+  const [invUpdateAmounts, setInvUpdateAmounts] = useState<Record<string, string>>({});
 
   // ==========================================
   // 🧮 5. MOTOR DE CÁLCULO (LA MAGIA MATEMÁTICA)
@@ -278,6 +312,62 @@ export default function NexusWallstreetSaaS() {
           </div>
         </div>
       </div>
+
+      {/* DISTRIBUCIÓN DE CAPITAL */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="bg-[#0A0A16]/90 border border-white/10 p-6 rounded-2xl h-[300px]">
+          <h3 className="text-xs text-gray-400 uppercase tracking-widest mb-4">Distribución del Capital</h3>
+          <ResponsiveContainer width="100%" height="85%">
+            <PieChart>
+              <Pie
+                data={[
+                  { name: "Liquidez", value: liquidWallet, fill: "#7000ff" },
+                  { name: "Inv. Pasivas", value: investments.filter(i => i.category === "PASIVA").reduce((s,i) => s + i.currentAmount, 0), fill: "#ff0055" },
+                  { name: "Inv. Activas", value: investments.filter(i => i.category === "ACTIVA").reduce((s,i) => s + i.currentAmount, 0), fill: "#00f0ff" },
+                ].filter(d => d.value > 0)}
+                cx="50%"
+                cy="50%"
+                innerRadius={60}
+                outerRadius={90}
+                paddingAngle={3}
+                dataKey="value"
+              >
+                {/* Cell colors are already in fill props */}
+              </Pie>
+              <RechartsTooltip
+                contentStyle={{ backgroundColor: '#05050A', borderColor: '#333', fontSize: '12px' }}
+                formatter={(val: number) => `$${val.toLocaleString()}`}
+              />
+            </PieChart>
+          </ResponsiveContainer>
+        </div>
+
+        {/* RECOMENDACIONES */}
+        <div className="bg-[#0A0A16]/90 border border-white/10 p-6 rounded-2xl">
+          <h3 className="text-xs text-gray-400 uppercase tracking-widest mb-4 flex items-center gap-2">
+            <Zap size={14} className="text-[#ffd700]" /> Radar de Oportunidades
+          </h3>
+          <div className="space-y-3">
+            {[
+              { icon: "🏆", title: "S&P 500 (SPY)", desc: "Históricamente +10% anual promedio. Base sólida para cualquier portafolio.", tag: "ETF Seguro" },
+              { icon: "⚡", title: "NVIDIA (NVDA)", desc: "Líder indiscutible en chips para IA. Alto riesgo, altísima recompensa.", tag: "Alto Potencial" },
+              { icon: "🔒", title: "Dafuturo (CDT a la vista)", desc: "Liquidez inmediata con rentabilidad fija. Ideal para tu fondo de emergencia.", tag: "Inversión Pasiva" },
+              { icon: "🌍", title: "VWO (Emergentes)", desc: "Mercados en crecimiento: India, China, Brasil. Diversificación global.", tag: "Diversificación" },
+            ].map((rec, i) => (
+              <div key={i} className="flex gap-3 p-3 rounded-xl bg-[#05050A] border border-white/5 hover:border-white/10 transition-all">
+                <span className="text-xl">{rec.icon}</span>
+                <div className="flex-1 min-w-0">
+                  <div className="flex justify-between items-start">
+                    <p className="text-xs font-bold text-white">{rec.title}</p>
+                    <span className="text-[8px] px-2 py-0.5 rounded bg-[#7000ff]/20 text-[#7000ff] border border-[#7000ff]/30 whitespace-nowrap ml-2">{rec.tag}</span>
+                  </div>
+                  <p className="text-[10px] text-gray-500 mt-0.5 leading-relaxed">{rec.desc}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
     </div>
   );
 
@@ -359,9 +449,30 @@ export default function NexusWallstreetSaaS() {
               <AnimatePresence>
                 {expandedInvId === inv.id && (
                   <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden border-t border-white/10 mt-2 pt-4">
-                    <div className="flex gap-2 mb-4">
-                      <button onClick={() => handleUpdateInvestmentAmount(inv.id, 50000, "ADD")} className="flex-1 bg-[#00ffaa]/10 text-[#00ffaa] border border-[#00ffaa]/30 text-[10px] py-1 rounded"> +$50k </button>
-                      <button onClick={() => handleUpdateInvestmentAmount(inv.id, 50000, "WITHDRAW")} className="flex-1 bg-[#ff0055]/10 text-[#ff0055] border border-[#ff0055]/30 text-[10px] py-1 rounded"> -$50k </button>
+                    <div className="flex gap-2 mb-4 items-center">
+                      <div className="relative flex-1">
+                        <span className="absolute left-2 top-1.5 text-gray-500 text-[10px]">$</span>
+                        <input
+                          type="number"
+                          min="0"
+                          value={invUpdateAmounts[inv.id] ?? ""}
+                          onChange={(e) => setInvUpdateAmounts(prev => ({ ...prev, [inv.id]: e.target.value }))}
+                          placeholder="Monto"
+                          className="w-full bg-[#05050A] border border-white/10 rounded-lg py-1.5 pl-5 pr-2 text-[10px] text-white outline-none focus:border-[#00f0ff]"
+                        />
+                      </div>
+                      <button
+                        onClick={() => handleUpdateInvestmentAmount(inv.id, Number(invUpdateAmounts[inv.id] || 50000), "ADD")}
+                        className="flex-1 bg-[#00ffaa]/10 text-[#00ffaa] border border-[#00ffaa]/30 text-[10px] py-1.5 rounded flex items-center justify-center gap-1"
+                      >
+                        <Plus size={10} /> Inyectar
+                      </button>
+                      <button
+                        onClick={() => handleUpdateInvestmentAmount(inv.id, Number(invUpdateAmounts[inv.id] || 50000), "WITHDRAW")}
+                        className="flex-1 bg-[#ff0055]/10 text-[#ff0055] border border-[#ff0055]/30 text-[10px] py-1.5 rounded flex items-center justify-center gap-1"
+                      >
+                        <Minus size={10} /> Retirar
+                      </button>
                     </div>
                     <div className="h-[120px] w-full">
                       <ResponsiveContainer width="100%" height="100%">
@@ -482,13 +593,116 @@ export default function NexusWallstreetSaaS() {
   // ==========================================
   // 🖥️ 9. RENDER: MÓDULO "SEARCH" (Placeholder Parte 3)
   // ==========================================
-  const renderSearch = () => (
-    <div className="flex flex-col items-center justify-center h-full text-center space-y-4 animate-in fade-in duration-500">
-      <Search size={64} className="text-gray-600 mb-4" />
-      <h2 className="text-2xl font-bold text-white uppercase tracking-widest">Buscador de ETFs / Acciones</h2>
-      <p className="text-gray-500 max-w-md text-sm">Próximamente... Aquí conectaremos con el mercado real para que busques el S&P 500 y lo integres a tus Inversiones Activas.</p>
+  const renderSearch = () => {
+  const filteredCatalog = MARKET_CATALOG.filter(asset => {
+    const matchesQuery = asset.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                         asset.symbol.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                         asset.sector.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesFilter = searchFilter === "ALL" || asset.type === searchFilter;
+    return matchesQuery && matchesFilter;
+  });
+
+  return (
+    <div className="space-y-6 animate-in fade-in duration-500 pb-10">
+      {/* Header */}
+      <div className="border-b border-white/5 pb-4">
+        <h2 className="text-xl font-bold text-white tracking-widest uppercase">Buscador de Mercados</h2>
+        <p className="text-xs text-gray-500 mt-1">Encuentra ETFs o acciones y crea una inversión activa directamente.</p>
+      </div>
+
+      {/* Search Bar + Filters */}
+      <div className="flex flex-col sm:flex-row gap-3">
+        <div className="relative flex-1">
+          <Search size={14} className="absolute left-3 top-3 text-gray-500" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Buscar por símbolo, nombre o sector..."
+            className="w-full bg-[#0A0A16] border border-white/10 rounded-xl py-2.5 pl-9 pr-4 text-sm text-white outline-none focus:border-[#7000ff] transition-colors"
+          />
+        </div>
+        <div className="flex gap-2">
+          {(["ALL", "ETF", "STOCK"] as const).map(f => (
+            <button
+              key={f}
+              onClick={() => setSearchFilter(f)}
+              className={`px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-widest transition-all ${
+                searchFilter === f
+                  ? "bg-[#7000ff]/20 text-[#7000ff] border border-[#7000ff]/50"
+                  : "bg-[#0A0A16] text-gray-500 border border-white/10 hover:border-white/20"
+              }`}
+            >
+              {f === "ALL" ? "Todos" : f}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Catalog Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+        {filteredCatalog.length === 0 ? (
+          <div className="col-span-full py-16 text-center text-gray-500">
+            <Search size={40} className="mx-auto mb-3 opacity-30" />
+            <p>Sin resultados para &quot;{searchQuery}&quot;</p>
+          </div>
+        ) : (
+          filteredCatalog.map(asset => {
+            const alreadyInPortfolio = investments.some(inv => inv.name.includes(asset.symbol) || inv.name === asset.name);
+            return (
+              <motion.div
+                key={asset.symbol}
+                whileHover={{ scale: 1.02 }}
+                className="bg-[#0A0A16]/90 border border-white/10 rounded-2xl p-5 flex flex-col gap-3 cursor-pointer hover:border-[#7000ff]/40 transition-all"
+                style={{ borderTopColor: asset.suggestedColor, borderTopWidth: 3 }}
+              >
+                <div className="flex justify-between items-start">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-lg font-black text-white font-mono">{asset.symbol}</span>
+                      <span className="text-[9px] px-2 py-0.5 rounded border text-gray-400 border-white/10 uppercase tracking-widest">
+                        {asset.type}
+                      </span>
+                    </div>
+                    <p className="text-xs text-gray-400 mt-0.5">{asset.name}</p>
+                  </div>
+                  <span
+                    className="text-[9px] px-2 py-1 rounded-lg border"
+                    style={{ color: asset.suggestedColor, borderColor: `${asset.suggestedColor}40`, backgroundColor: `${asset.suggestedColor}10` }}
+                  >
+                    {asset.sector}
+                  </span>
+                </div>
+
+                <p className="text-xs text-gray-500 leading-relaxed">{asset.description}</p>
+
+                {alreadyInPortfolio ? (
+                  <div className="flex items-center gap-2 bg-[#00ffaa]/5 border border-[#00ffaa]/20 rounded-lg px-3 py-2">
+                    <CheckCircle2 size={12} className="text-[#00ffaa]" />
+                    <span className="text-[10px] text-[#00ffaa]">Ya está en tu portafolio</span>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => {
+                      setNewInvName(`${asset.name} (${asset.symbol})`);
+                      setNewInvColor(asset.suggestedColor);
+                      setInvFormType("ACTIVA");
+                      setIsInvModalOpen(true);
+                      setActiveTab("inversiones");
+                    }}
+                    className="w-full bg-[#7000ff]/10 hover:bg-[#7000ff]/20 border border-[#7000ff]/30 text-[#7000ff] py-2 rounded-xl text-xs font-bold uppercase tracking-widest transition-all flex items-center justify-center gap-2"
+                  >
+                    <Plus size={12} /> Agregar al Portafolio
+                  </button>
+                )}
+              </motion.div>
+            );
+          })
+        )}
+      </div>
     </div>
   );
+};
 
   // ==========================================
   // 🖥️ 10. LAYOUT MAESTRO Y NAVEGACIÓN
