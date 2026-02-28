@@ -250,7 +250,7 @@ export default function NexusWallstreetSaaS() {
               <CartesianGrid strokeDasharray="3 3" stroke="#ffffff05" vertical={false} />
               <XAxis dataKey="name" stroke="#ffffff30" fontSize={10} />
               <YAxis stroke="#ffffff30" fontSize={10} tickFormatter={(val) => `$${val / 1000}k`} />
-              <RechartsTooltip contentStyle={{ backgroundColor: '#05050A', borderColor: '#333' }} formatter={(val: number) => `$${val.toLocaleString()}`} />
+              <RechartsTooltip contentStyle={{ backgroundColor: '#05050A', borderColor: '#333' }} formatter={(val) => typeof val === "number" ? `$${val.toLocaleString()}` : String(val)} />
               <Area type="monotone" dataKey="neto" stroke="#00f0ff" fillOpacity={1} fill="url(#colorNeto)" name="Capital Neto" />
               <Area type="monotone" dataKey="gastos" stroke="#ff0055" fillOpacity={1} fill="url(#colorGastos)" name="Gastos/Hormiga" />
             </AreaChart>
@@ -367,7 +367,7 @@ export default function NexusWallstreetSaaS() {
                       <ResponsiveContainer width="100%" height="100%">
                         <LineChart data={inv.history.length > 0 ? inv.history : [{ date: 'Inicio', value: inv.initialAmount }, { date: 'Hoy', value: inv.currentAmount }]}>
                           <CartesianGrid strokeDasharray="3 3" stroke="#ffffff05" vertical={false} />
-                          <RechartsTooltip contentStyle={{ backgroundColor: '#05050A', borderColor: '#333', fontSize: '12px' }} formatter={(val: number) => `$${val.toLocaleString()}`} />
+                          <RechartsTooltip contentStyle={{ backgroundColor: '#05050A', borderColor: '#333', fontSize: '12px' }} formatter={(val) => typeof val === "number" ? `$${val.toLocaleString()}` : String(val)} />
                           <Line type="monotone" dataKey="value" stroke={inv.color} strokeWidth={2} dot={{ r: 3, fill: inv.color }} />
                         </LineChart>
                       </ResponsiveContainer>
@@ -390,7 +390,7 @@ export default function NexusWallstreetSaaS() {
                 <CartesianGrid strokeDasharray="3 3" stroke="#ffffff05" vertical={false} />
                 <XAxis dataKey="name" stroke="#ffffff30" fontSize={10} />
                 <YAxis stroke="#ffffff30" fontSize={10} tickFormatter={(val) => `$${val / 1000}k`} />
-                <RechartsTooltip contentStyle={{ backgroundColor: '#05050A', borderColor: '#333' }} cursor={{ fill: '#ffffff05' }} formatter={(val: number) => `$${val.toLocaleString()}`} />
+                <RechartsTooltip contentStyle={{ backgroundColor: '#05050A', borderColor: '#333' }} cursor={{ fill: '#ffffff05' }} formatter={(val) => typeof val === "number" ? `$${val.toLocaleString()}` : String(val)} />
                 <Bar dataKey="rentabilidad" radius={[4, 4, 0, 0]}>
                   {comparativeData.map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={entry.fill} />
