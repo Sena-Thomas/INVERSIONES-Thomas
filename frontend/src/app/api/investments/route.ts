@@ -1,19 +1,21 @@
 import { NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
-import { Pool } from 'pg';
-import { PrismaPg } from '@prisma/adapter-pg';
-
-// 1. Configuramos la conexión (igual que en wallet)
-const pool = new Pool({ connectionString: process.env.DATABASE_URL });
-const adapter = new PrismaPg(pool);
-const prisma = new PrismaClient({ adapter });
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
+import { prisma } from '@/lib/prisma';
 
 // GET: Traer todas las inversiones con su historial para las gráficas
 export async function GET() {
+    const session = await getServerSession(authOptions);
+    if (!session?.user?.id) {
+        return NextResponse.json({ error: "No autenticado" }, { status: 401 });
+    }
+    const userId = session.user.id;
+
     try {
         const investments = await prisma.investment.findMany({
+            where: { userId },
             include: {
-                history: { orderBy: { date: 'asc' } } // Trae los puntos de la gráfica en orden
+                history: { orderBy: { date: 'asc' } }
             }
         });
         return NextResponse.json(investments);
@@ -25,13 +27,19 @@ export async function GET() {
 
 // POST: Crear una nueva inversión (Ej: CDT o S&P 500)
 export async function POST(req: Request) {
+    const session = await getServerSession(authOptions);
+    if (!session?.user?.id) {
+        return NextResponse.json({ error: "No autenticado" }, { status: 401 });
+    }
+    const userId = session.user.id;
+
     try {
         const body = await req.json();
         const { name, category, color, initialAmount, isLiquid, minBalance } = body;
 
-        // Se crea la inversión y el primer punto en la gráfica automáticamente
         const newInvestment = await prisma.investment.create({
             data: {
+                userId,
                 name,
                 category,
                 color,
@@ -40,7 +48,7 @@ export async function POST(req: Request) {
                 isLiquid,
                 minBalance: Number(minBalance),
                 history: {
-                    create: { value: Number(initialAmount) } // Primer punto de la gráfica
+                    create: { value: Number(initialAmount) }
                 }
             },
             include: { history: true }
@@ -55,16 +63,26 @@ export async function POST(req: Request) {
 
 // PUT: Actualizar saldo de inversión (Inyectar o Retirar plata de un fondo)
 export async function PUT(req: Request) {
+    const session = await getServerSession(authOptions);
+    if (!session?.user?.id) {
+        return NextResponse.json({ error: "No autenticado" }, { status: 401 });
+    }
+    const userId = session.user.id;
+
     try {
         const body = await req.json();
         const { id, newAmount } = body;
+
+        // Verificar que la inversión pertenece al usuario
+        const existing = await prisma.investment.findFirst({ where: { id, userId } });
+        if (!existing) return NextResponse.json({ error: "Inversión no encontrada" }, { status: 404 });
 
         const updatedInvestment = await prisma.investment.update({
             where: { id },
             data: {
                 currentAmount: Number(newAmount),
                 history: {
-                    create: { value: Number(newAmount) } // Agrega el nuevo punto a la gráfica
+                    create: { value: Number(newAmount) }
                 }
             },
             include: { history: true }

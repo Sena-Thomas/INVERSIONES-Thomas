@@ -1,15 +1,23 @@
 "use client";
 
 import React, { useState, useEffect, useMemo } from "react";
+import { useSession, signIn, signOut } from "next-auth/react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer,
   AreaChart, Area, PieChart, Pie, Cell
 } from "recharts";
 import {
-  Activity, Wallet, TrendingDown, TrendingUp, Plus, Minus, Search,
-  PieChart as PieChartIcon, MessageSquare, Zap, Send, ShieldAlert, CheckCircle2
+  Activity, Wallet, TrendingUp, Plus, Minus, Search,
+  PieChart as PieChartIcon, MessageSquare, Zap, Send, ShieldAlert, CheckCircle2, LogOut, Loader2
 } from "lucide-react";
+import {
+  getDashboardData,
+  registerTransaction,
+  createInvestment,
+  updateInvestment,
+  deleteInvestment,
+} from "@/app/actions";
 
 // ==========================================
 // 🧬 1. TIPOS Y ESTRUCTURAS DE DATOS (AZURE READY)
@@ -66,6 +74,20 @@ const MARKET_CATALOG: MarketAsset[] = [
 
 export default function NexusWallstreetSaaS() {
   // ==========================================
+  // 🔐 AUTH & LOADING
+  // ==========================================
+  const { data: session, status } = useSession();
+  const [isDataLoading, setIsDataLoading] = useState(true);
+
+  // ==========================================
+  // 🤖 ESTADOS: ASISTENTE IA
+  // ==========================================
+  const [isChatOpen, setIsChatOpen] = useState(false);
+  const [chatMessages, setChatMessages] = useState<{ role: "user" | "ai"; text: string }[]>([]);
+  const [chatInput, setChatInput] = useState("");
+  const [isChatLoading, setIsChatLoading] = useState(false);
+
+  // ==========================================
   // 🧭 2. ESTADOS GLOBALES DE LA APLICACIÓN
   // ==========================================
   const [activeTab, setActiveTab] = useState("mi_estado");
@@ -111,6 +133,37 @@ export default function NexusWallstreetSaaS() {
   const [invUpdateAmounts, setInvUpdateAmounts] = useState<Record<string, string>>({});
 
   // ==========================================
+  // 🔄 CARGA DE DATOS DESDE LA BASE DE DATOS
+  // ==========================================
+  useEffect(() => {
+    if (status !== "authenticated") return;
+    setIsDataLoading(true);
+    getDashboardData()
+      .then((data) => {
+        setLiquidWallet(data.liquidBalance);
+        setTransactions(
+          data.transactions.map((t) => ({
+            ...t,
+            type: t.type as "IN" | "OUT",
+            date: t.date instanceof Date ? t.date.toISOString() : String(t.date),
+          }))
+        );
+        setInvestments(
+          data.investments.map((inv) => ({
+            ...inv,
+            category: inv.category as "PASIVA" | "ACTIVA",
+            history: inv.history.map((h) => ({
+              date: h.date instanceof Date ? h.date.toISOString().split("T")[0] : String(h.date),
+              value: h.value,
+            })),
+          }))
+        );
+      })
+      .catch(console.error)
+      .finally(() => setIsDataLoading(false));
+  }, [status]);
+
+  // ==========================================
   // 🧮 5. MOTOR DE CÁLCULO (LA MAGIA MATEMÁTICA)
   // ==========================================
 
@@ -126,7 +179,7 @@ export default function NexusWallstreetSaaS() {
   // ==========================================
 
   // Manejo de Billetera (Gastos Hormiga / Ingresos)
-  const handleTransaction = () => {
+  const handleTransaction = async () => {
     const amount = Number(txAmount);
     if (!amount || amount <= 0) return;
 
@@ -135,21 +188,29 @@ export default function NexusWallstreetSaaS() {
       return;
     }
 
-    const newTx: WalletTransaction = {
-      id: Math.random().toString(36).substr(2, 9),
-      amount: amount,
-      type: txType,
-      description: txDesc || (txType === "IN" ? "Ingreso Extra" : "Gasto / Hormiga"),
-      date: new Date().toISOString()
-    };
-
-    setLiquidWallet(prev => txType === "IN" ? prev + amount : prev - amount);
-    setTransactions(prev => [newTx, ...prev]);
+    try {
+      const result = await registerTransaction({
+        amount,
+        type: txType,
+        description: txDesc || (txType === "IN" ? "Ingreso Extra" : "Gasto / Hormiga"),
+      });
+      setLiquidWallet(result.liquidBalance);
+      const newTx = {
+        ...result.transaction,
+        type: result.transaction.type as "IN" | "OUT",
+        date: result.transaction.date instanceof Date
+          ? result.transaction.date.toISOString()
+          : String(result.transaction.date),
+      };
+      setTransactions((prev) => [newTx, ...prev]);
+    } catch (e: unknown) {
+      alert(e instanceof Error ? e.message : "Error registrando transacción");
+    }
     setTxAmount(""); setTxDesc("");
   };
 
   // Crear Inversión (Saca de billetera, mete a fondo)
-  const handleCreateInvestment = () => {
+  const handleCreateInvestment = async () => {
     const amount = Number(newInvAmount);
     if (!newInvName || amount <= 0) return;
 
@@ -158,62 +219,93 @@ export default function NexusWallstreetSaaS() {
       return;
     }
 
-    setLiquidWallet(prev => prev - amount);
-
-    const newInvestment: Investment = {
-      id: Math.random().toString(36).substr(2, 9),
-      name: newInvName,
-      category: invFormType,
-      color: newInvColor,
-      initialAmount: amount,
-      currentAmount: amount,
-      isLiquid: newInvLiquid,
-      minBalance: Number(newInvMinBalance),
-      history: [{ date: new Date().toISOString().split('T')[0], value: amount }]
-    };
-
-    setInvestments([...investments, newInvestment]);
+    try {
+      const result = await createInvestment({
+        name: newInvName,
+        category: invFormType,
+        color: newInvColor,
+        initialAmount: amount,
+        isLiquid: newInvLiquid,
+        minBalance: Number(newInvMinBalance),
+      });
+      setLiquidWallet(result.liquidBalance);
+      const inv = result.investment;
+      setInvestments((prev) => [
+        ...prev,
+        {
+          ...inv,
+          category: inv.category as "PASIVA" | "ACTIVA",
+          history: inv.history.map((h) => ({
+            date: h.date instanceof Date ? h.date.toISOString().split("T")[0] : String(h.date),
+            value: h.value,
+          })),
+        },
+      ]);
+    } catch (e: unknown) {
+      alert(e instanceof Error ? e.message : "Error creando inversión");
+    }
     setIsInvModalOpen(false);
     setNewInvName(""); setNewInvAmount(""); setNewInvMinBalance("0");
   };
 
   // Actualizar Inversión (Validación de Dafuturo 200k)
-  const handleUpdateInvestmentAmount = (invId: string, amountToChange: number, type: "ADD" | "WITHDRAW") => {
-    setInvestments(investments.map(inv => {
-      if (inv.id === invId) {
-        let newCurrent = inv.currentAmount;
-
-        if (type === "WITHDRAW") {
-          if (!inv.isLiquid) {
-            alert(`¡Alerta! Este fondo (${inv.name}) no es líquido (Ej: CDT). No puedes retirar.`);
-            return inv;
-          }
-          if (inv.minBalance > 0 && (newCurrent - amountToChange) < inv.minBalance) {
-            alert(`¡Límite alcanzado! El fondo exige saldo mínimo de $${inv.minBalance}. Solo puedes retirar hasta $${newCurrent - inv.minBalance}`);
-            return inv;
-          }
-          newCurrent -= amountToChange;
-          setLiquidWallet(prev => prev + amountToChange);
-        } else {
-          if (amountToChange > liquidWallet) {
-            alert("No tienes tanta liquidez para inyectarle a este fondo.");
-            return inv;
-          }
-          newCurrent += amountToChange;
-          setLiquidWallet(prev => prev - amountToChange);
-        }
-
-        const newHistory = [...inv.history, { date: new Date().toISOString().split('T')[0], value: newCurrent }];
-        return { ...inv, currentAmount: newCurrent, history: newHistory };
-      }
-      return inv;
-    }));
+  const handleUpdateInvestmentAmount = async (invId: string, amountToChange: number, type: "ADD" | "WITHDRAW") => {
+    try {
+      const result = await updateInvestment({ investmentId: invId, amount: amountToChange, type });
+      setLiquidWallet(result.liquidBalance);
+      const updated = result.investment;
+      setInvestments((prev) =>
+        prev.map((inv) =>
+          inv.id === invId
+            ? {
+                ...updated,
+                category: updated.category as "PASIVA" | "ACTIVA",
+                history: updated.history.map((h) => ({
+                  date: h.date instanceof Date ? h.date.toISOString().split("T")[0] : String(h.date),
+                  value: h.value,
+                })),
+              }
+            : inv
+        )
+      );
+    } catch (e: unknown) {
+      alert(e instanceof Error ? e.message : "Error actualizando inversión");
+    }
   };
 
-  const handleDeleteInvestment = (inv: Investment) => {
+  const handleDeleteInvestment = async (inv: Investment) => {
     if (confirm(`¿Cerrar ${inv.name}? Tu saldo de $${inv.currentAmount} volverá a tu Billetera.`)) {
-      setLiquidWallet(prev => prev + inv.currentAmount);
-      setInvestments(investments.filter(i => i.id !== inv.id));
+      try {
+        const result = await deleteInvestment(inv.id);
+        setLiquidWallet(result.liquidBalance);
+        setInvestments((prev) => prev.filter((i) => i.id !== inv.id));
+      } catch (e: unknown) {
+        alert(e instanceof Error ? e.message : "Error eliminando inversión");
+      }
+    }
+  };
+
+  // ==========================================
+  // 🤖 LÓGICA DEL ASISTENTE IA
+  // ==========================================
+  const handleSendChatMessage = async () => {
+    if (!chatInput.trim() || isChatLoading) return;
+    const userMessage = chatInput.trim();
+    setChatMessages((prev) => [...prev, { role: "user", text: userMessage }]);
+    setChatInput("");
+    setIsChatLoading(true);
+    try {
+      const res = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: userMessage }),
+      });
+      const data = await res.json();
+      setChatMessages((prev) => [...prev, { role: "ai", text: data.reply ?? "Sin respuesta." }]);
+    } catch {
+      setChatMessages((prev) => [...prev, { role: "ai", text: "Error conectando al asistente IA." }]);
+    } finally {
+      setIsChatLoading(false);
     }
   };
 
@@ -709,6 +801,74 @@ export default function NexusWallstreetSaaS() {
   // ==========================================
   // 🖥️ 10. LAYOUT MAESTRO Y NAVEGACIÓN
   // ==========================================
+
+  // Pantalla de carga mientras se verifica la sesión
+  if (status === "loading") {
+    return (
+      <div className="flex h-screen bg-[#05050A] items-center justify-center">
+        <Loader2 size={40} className="text-[#00f0ff] animate-spin" />
+      </div>
+    );
+  }
+
+  // Pantalla de Login si no está autenticado
+  if (status === "unauthenticated") {
+    return (
+      <div className="flex h-screen bg-[#05050A] text-white font-mono items-center justify-center relative overflow-hidden">
+        {/* Fondo decorativo */}
+        <div className="absolute inset-0 bg-gradient-to-br from-[#00f0ff]/5 via-transparent to-[#7000ff]/5" />
+        <div className="absolute top-1/4 left-1/4 w-64 h-64 rounded-full bg-[#00f0ff]/5 blur-3xl" />
+        <div className="absolute bottom-1/4 right-1/4 w-64 h-64 rounded-full bg-[#7000ff]/5 blur-3xl" />
+
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6 }}
+          className="relative z-10 flex flex-col items-center gap-8 p-10 bg-[#0A0A16]/80 border border-white/10 rounded-3xl backdrop-blur-md shadow-2xl max-w-md w-full mx-4"
+        >
+          {/* Logo */}
+          <div className="flex flex-col items-center gap-3">
+            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-[#00f0ff] to-[#7000ff] flex items-center justify-center font-black text-black text-2xl shadow-[0_0_30px_rgba(0,240,255,0.3)]">
+              N
+            </div>
+            <div className="text-center">
+              <h1 className="text-2xl font-black tracking-widest uppercase text-white">Nexus SaaS</h1>
+              <p className="text-xs text-gray-500 mt-1 uppercase tracking-widest">Dashboard Financiero Inteligente</p>
+            </div>
+          </div>
+
+          {/* Descripción */}
+          <div className="text-center space-y-2">
+            <p className="text-sm text-gray-400">Controla tu billetera, inversiones y patrimonio neto con IA real.</p>
+            <div className="flex gap-3 justify-center mt-4">
+              {["💰 Billetera", "📊 Inversiones", "🤖 IA Financiera"].map((f) => (
+                <span key={f} className="text-[10px] px-2 py-1 rounded bg-white/5 border border-white/10 text-gray-400">{f}</span>
+              ))}
+            </div>
+          </div>
+
+          {/* Botón de Google */}
+          <button
+            onClick={() => signIn("google")}
+            className="w-full flex items-center justify-center gap-3 bg-white text-black font-bold py-3 px-6 rounded-xl hover:bg-gray-100 transition-all shadow-lg text-sm"
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24">
+              <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+              <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+              <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+              <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+            </svg>
+            Iniciar sesión con Google
+          </button>
+
+          <p className="text-[10px] text-gray-600 text-center">
+            Tu información financiera es privada y segura. Solo tú puedes ver tus datos.
+          </p>
+        </motion.div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex h-screen bg-[#05050A] text-white font-mono overflow-hidden selection:bg-[#00f0ff] selection:text-black">
 
@@ -734,6 +894,33 @@ export default function NexusWallstreetSaaS() {
             <Search size={18} />
             <span className="hidden md:block text-xs font-bold uppercase tracking-widest">Search ETF</span>
           </button>
+
+          {/* Asistente IA */}
+          <button onClick={() => setIsChatOpen(true)} className={`flex items-center gap-3 p-3 rounded-xl transition-all text-gray-500 hover:bg-white/5 hover:text-white`}>
+            <MessageSquare size={18} />
+            <span className="hidden md:block text-xs font-bold uppercase tracking-widest">Asesor IA</span>
+          </button>
+        </div>
+
+        {/* Perfil y Logout */}
+        <div className="mt-auto flex flex-col gap-2">
+          <div className="hidden md:flex items-center gap-2 p-2 rounded-xl bg-white/5 border border-white/5">
+            {session?.user?.image && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={session.user.image} alt="avatar" className="w-7 h-7 rounded-full" />
+            )}
+            <div className="flex-1 min-w-0">
+              <p className="text-[10px] text-white truncate">{session?.user?.name}</p>
+              <p className="text-[9px] text-gray-500 truncate">{session?.user?.email}</p>
+            </div>
+          </div>
+          <button
+            onClick={() => signOut()}
+            className="flex items-center gap-3 p-3 rounded-xl transition-all text-gray-500 hover:bg-[#ff0055]/10 hover:text-[#ff0055]"
+          >
+            <LogOut size={18} />
+            <span className="hidden md:block text-xs font-bold uppercase tracking-widest">Salir</span>
+          </button>
         </div>
       </nav>
 
@@ -750,9 +937,13 @@ export default function NexusWallstreetSaaS() {
           {/* AQUÍ ESTÁ EL TOTAL: Suma de la billetera + inversiones */}
           <div className="text-right">
             <h2 className="text-[10px] text-gray-500 uppercase tracking-widest">Capital Neto (Intocable)</h2>
-            <p className="text-3xl md:text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-[#00f0ff] to-[#7000ff]">
-              ${NET_CAPITAL.toLocaleString()}
-            </p>
+            {isDataLoading ? (
+              <Loader2 size={28} className="text-[#00f0ff] animate-spin ml-auto mt-1" />
+            ) : (
+              <p className="text-3xl md:text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-[#00f0ff] to-[#7000ff]">
+                ${NET_CAPITAL.toLocaleString()}
+              </p>
+            )}
           </div>
         </header>
 
@@ -763,6 +954,90 @@ export default function NexusWallstreetSaaS() {
           {activeTab === "search" && renderSearch()}
         </div>
       </main>
+
+      {/* 🤖 PANEL DE ASISTENTE IA (Overlay) */}
+      <AnimatePresence>
+        {isChatOpen && (
+          <motion.div
+            initial={{ x: "100%" }}
+            animate={{ x: 0 }}
+            exit={{ x: "100%" }}
+            transition={{ type: "spring", damping: 20 }}
+            className="fixed right-0 top-0 h-full w-full max-w-sm bg-[#0A0A16] border-l border-white/10 z-50 flex flex-col shadow-2xl"
+          >
+            <div className="flex justify-between items-center p-4 border-b border-white/10">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#00f0ff] to-[#7000ff] flex items-center justify-center">
+                  <MessageSquare size={14} className="text-black" />
+                </div>
+                <div>
+                  <p className="text-xs font-bold text-white uppercase tracking-widest">Asesor IA</p>
+                  <p className="text-[9px] text-gray-500">Analiza tus finanzas en tiempo real</p>
+                </div>
+              </div>
+              <button onClick={() => setIsChatOpen(false)} className="text-gray-500 hover:text-white transition-colors text-lg leading-none">✕</button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto custom-scrollbar p-4 space-y-3">
+              {chatMessages.length === 0 && (
+                <div className="text-center py-8">
+                  <MessageSquare size={32} className="mx-auto mb-3 text-gray-600" />
+                  <p className="text-xs text-gray-500">Pregúntame algo sobre tus finanzas.</p>
+                  <div className="mt-4 space-y-2">
+                    {["¿En qué puedo mejorar mis gastos?", "¿Cómo diversificar mejor?", "Analiza mi portafolio"].map((q) => (
+                      <button
+                        key={q}
+                        onClick={() => setChatInput(q)}
+                        className="block w-full text-left px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-[10px] text-gray-400 hover:border-[#00f0ff]/30 hover:text-white transition-all"
+                      >
+                        {q}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {chatMessages.map((msg, i) => (
+                <div key={i} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
+                  <div
+                    className={`max-w-[85%] px-3 py-2 rounded-xl text-xs leading-relaxed ${
+                      msg.role === "user"
+                        ? "bg-[#00f0ff]/10 text-white border border-[#00f0ff]/20"
+                        : "bg-white/5 text-gray-300 border border-white/10"
+                    }`}
+                  >
+                    {msg.text}
+                  </div>
+                </div>
+              ))}
+              {isChatLoading && (
+                <div className="flex justify-start">
+                  <div className="bg-white/5 border border-white/10 px-3 py-2 rounded-xl">
+                    <Loader2 size={14} className="text-[#00f0ff] animate-spin" />
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="p-4 border-t border-white/10 flex gap-2">
+              <input
+                type="text"
+                value={chatInput}
+                onChange={(e) => setChatInput(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleSendChatMessage()}
+                placeholder="Escribe tu pregunta..."
+                className="flex-1 bg-[#05050A] border border-white/10 rounded-xl px-3 py-2 text-xs text-white outline-none focus:border-[#00f0ff] transition-colors"
+              />
+              <button
+                onClick={handleSendChatMessage}
+                disabled={isChatLoading || !chatInput.trim()}
+                className="bg-[#00f0ff]/10 border border-[#00f0ff]/30 text-[#00f0ff] p-2 rounded-xl hover:bg-[#00f0ff]/20 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                <Send size={14} />
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
     </div>
   );

@@ -1,25 +1,26 @@
 import { NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
-import { Pool } from 'pg';
-import { PrismaPg } from '@prisma/adapter-pg';
-
-// 1. Configuramos la conexión con el nuevo estándar de Prisma
-const pool = new Pool({ connectionString: process.env.DATABASE_URL });
-const adapter = new PrismaPg(pool);
-const prisma = new PrismaClient({ adapter });
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
+import { prisma } from '@/lib/prisma';
 
 // GET: Traer tu saldo líquido y últimos movimientos
 export async function GET() {
+    const session = await getServerSession(authOptions);
+    if (!session?.user?.id) {
+        return NextResponse.json({ error: "No autenticado" }, { status: 401 });
+    }
+    const userId = session.user.id;
+
     try {
-        // Busca el perfil (si no existe, lo crea con saldo base de 300k para que tengas con qué jugar)
-        let profile = await prisma.userProfile.findFirst();
+        let profile = await prisma.userProfile.findUnique({ where: { userId } });
         if (!profile) {
-            profile = await prisma.userProfile.create({ data: { liquidBalance: 300000 } });
+            profile = await prisma.userProfile.create({ data: { userId, liquidBalance: 300000 } });
         }
 
         const transactions = await prisma.walletTransaction.findMany({
+            where: { userId },
             orderBy: { date: 'desc' },
-            take: 20 // Últimos 20 movimientos
+            take: 20
         });
 
         return NextResponse.json({ liquidBalance: profile.liquidBalance, transactions });
@@ -31,29 +32,32 @@ export async function GET() {
 
 // POST: Registrar nuevo ingreso o gasto
 export async function POST(req: Request) {
+    const session = await getServerSession(authOptions);
+    if (!session?.user?.id) {
+        return NextResponse.json({ error: "No autenticado" }, { status: 401 });
+    }
+    const userId = session.user.id;
+
     try {
         const body = await req.json();
         const { amount, type, description } = body;
 
-        let profile = await prisma.userProfile.findFirst();
+        const profile = await prisma.userProfile.findUnique({ where: { userId } });
         if (!profile) return NextResponse.json({ error: "Perfil no encontrado" }, { status: 404 });
 
-        // Regla de negocio: No gastar más de lo que hay
         if (type === "OUT" && amount > profile.liquidBalance) {
             return NextResponse.json({ error: "Fondos insuficientes" }, { status: 400 });
         }
 
-        // Actualizamos saldo matemático
         const newBalance = type === "IN" ? profile.liquidBalance + amount : profile.liquidBalance - amount;
 
-        // Transacción segura: Actualiza perfil y crea el registro al mismo tiempo
         const [updatedProfile, newTx] = await prisma.$transaction([
             prisma.userProfile.update({
-                where: { id: profile.id },
+                where: { userId },
                 data: { liquidBalance: newBalance }
             }),
             prisma.walletTransaction.create({
-                data: { amount: Number(amount), type, description }
+                data: { userId, amount: Number(amount), type, description }
             })
         ]);
 
