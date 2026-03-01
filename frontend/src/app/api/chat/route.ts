@@ -63,19 +63,27 @@ ${investments.map((i) => `  * ${i.name} (${i.category}): Invertido $${i.initialA
     baseURL: 'https://api.x.ai/v1',
   });
 
-  const completion = await grokClient.chat.completions.create({
-    model: 'grok-3-mini',
-    messages: [
-      {
-        role: 'system',
-        content: `Eres un asesor financiero personal experto en inversiones, ahorro y optimización de gastos para el mercado latinoamericano (especialmente Colombia). Responde siempre en español, de forma concisa y con emojis financieros. Usa el contexto financiero real del usuario para dar consejos personalizados.\n\n${financialContext}`,
-      },
-      { role: 'user', content: message },
-    ],
-    max_tokens: 500,
-  });
+  try {
+    const completion = await grokClient.chat.completions.create({
+      model: 'grok-3-mini',
+      messages: [
+        {
+          role: 'system',
+          content: `Eres un asesor financiero personal experto en inversiones, ahorro y optimización de gastos para el mercado latinoamericano (especialmente Colombia). Responde siempre en español, de forma concisa y con emojis financieros. Usa el contexto financiero real del usuario para dar consejos personalizados.\n\n${financialContext}`,
+        },
+        { role: 'user', content: message },
+      ],
+      max_tokens: 500,
+    });
 
-  const reply = completion.choices[0]?.message?.content ?? 'Sin respuesta del modelo.';
+    const reply = completion.choices[0]?.message?.content ?? 'Sin respuesta del modelo.';
 
-  return NextResponse.json({ reply });
+    return NextResponse.json({ reply });
+  } catch (error) {
+    console.error('[Chat API] Error al llamar al proveedor de IA:', error);
+    return NextResponse.json(
+      { error: 'Error en el proveedor de IA. Por favor intenta de nuevo más tarde.' },
+      { status: 500 }
+    );
+  }
 }
