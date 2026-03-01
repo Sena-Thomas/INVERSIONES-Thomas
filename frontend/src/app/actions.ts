@@ -137,12 +137,43 @@ export async function createInvestment(data: {
 }
 
 // ==========================================
-// PUT: Actualizar saldo de inversión (inyectar o retirar)
+// DELETE: Eliminar una transacción (revierte el saldo)
+// ==========================================
+export async function deleteTransaction(id: string) {
+  const userId = await getAuthUserId();
+
+  const tx = await prisma.walletTransaction.findFirst({
+    where: { id, userId },
+  });
+  if (!tx) throw new Error('Transacción no encontrada');
+
+  const profile = await prisma.userProfile.findUnique({ where: { userId } });
+  if (!profile) throw new Error('Perfil no encontrado');
+
+  // Revertir el impacto en el saldo: si era ingreso, restar; si era gasto, sumar
+  const newBalance =
+    tx.type === 'IN'
+      ? profile.liquidBalance - tx.amount
+      : profile.liquidBalance + tx.amount;
+
+  await prisma.$transaction([
+    prisma.userProfile.update({
+      where: { userId },
+      data: { liquidBalance: newBalance },
+    }),
+    prisma.walletTransaction.delete({ where: { id } }),
+  ]);
+
+  return { liquidBalance: newBalance };
+}
+
+// ==========================================
+// PUT: Actualizar saldo de inversión (invertir más, rendimiento o retirar)
 // ==========================================
 export async function updateInvestment(data: {
   investmentId: string;
   amount: number;
-  type: 'ADD' | 'WITHDRAW';
+  type: 'ADD' | 'WITHDRAW' | 'RETURN';
 }) {
   const userId = await getAuthUserId();
 
@@ -155,6 +186,7 @@ export async function updateInvestment(data: {
   if (!profile) throw new Error('Perfil no encontrado');
 
   let newInvestmentAmount = investment.currentAmount;
+  let newInitialAmount = investment.initialAmount;
   let newLiquidBalance = profile.liquidBalance;
 
   if (data.type === 'WITHDRAW') {
@@ -169,15 +201,36 @@ export async function updateInvestment(data: {
         `Límite alcanzado. El fondo exige saldo mínimo de $${investment.minBalance}.`
       );
     }
+    if (data.amount > newInvestmentAmount) {
+      throw new Error('No puedes retirar más de lo que tiene la inversión.');
+    }
     newInvestmentAmount -= data.amount;
     newLiquidBalance += data.amount;
+  } else if (data.type === 'RETURN') {
+    // Solo modifica el valor actual (ganancia/pérdida), no afecta la billetera
+    newInvestmentAmount += data.amount;
+    if (newInvestmentAmount < 0) newInvestmentAmount = 0;
   } else {
+    // ADD: invierte más — descuenta de billetera y suma a capital invertido y valor actual
     if (data.amount > profile.liquidBalance) {
       throw new Error('No tienes suficiente liquidez para inyectar a este fondo.');
     }
     newInvestmentAmount += data.amount;
+    newInitialAmount += data.amount;
     newLiquidBalance -= data.amount;
   }
+
+  const investmentUpdateData =
+    data.type === 'ADD'
+      ? {
+          initialAmount: newInitialAmount,
+          currentAmount: newInvestmentAmount,
+          history: { create: { value: newInvestmentAmount } },
+        }
+      : {
+          currentAmount: newInvestmentAmount,
+          history: { create: { value: newInvestmentAmount } },
+        };
 
   const [updatedProfile, updatedInvestment] = await prisma.$transaction([
     prisma.userProfile.update({
@@ -186,10 +239,7 @@ export async function updateInvestment(data: {
     }),
     prisma.investment.update({
       where: { id: data.investmentId },
-      data: {
-        currentAmount: newInvestmentAmount,
-        history: { create: { value: newInvestmentAmount } },
-      },
+      data: investmentUpdateData,
       include: { history: { orderBy: { date: 'asc' } } },
     }),
   ]);

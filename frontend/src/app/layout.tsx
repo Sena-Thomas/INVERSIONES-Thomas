@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Nexus Wallstreet SaaS",
+  title: "Thomás-corp",
   description: "Dashboard financiero inteligente con IA",
 };
 

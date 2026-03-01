@@ -8,12 +8,13 @@ import {
   AreaChart, Area, PieChart, Pie, Cell
 } from "recharts";
 import {
-  Activity, Wallet, TrendingUp, Plus, Minus, Search,
+  Activity, Wallet, TrendingUp, TrendingDown, Plus, Minus, Search, Trash2,
   PieChart as PieChartIcon, MessageSquare, Zap, Send, ShieldAlert, CheckCircle2, LogOut, Loader2
 } from "lucide-react";
 import {
   getDashboardData,
   registerTransaction,
+  deleteTransaction,
   createInvestment,
   updateInvestment,
   deleteInvestment,
@@ -73,7 +74,7 @@ const MARKET_CATALOG: MarketAsset[] = [
   { symbol: "BRK.B", name: "Berkshire Hathaway B", type: "STOCK", description: "El portafolio de Warren Buffett.", suggestedColor: "#c8a96e", sector: "Holding" },
 ];
 
-export default function NexusWallstreetSaaS() {
+export default function ThomasCorpApp() {
   // ==========================================
   // 🔐 AUTH & LOADING
   // ==========================================
@@ -96,7 +97,7 @@ export default function NexusWallstreetSaaS() {
   // ==========================================
   // 💰 3. ESTADOS: "MI ESTADO" (BILLETERA LÍQUIDA)
   // ==========================================
-  const [liquidWallet, setLiquidWallet] = useState<number>(300000);
+  const [liquidWallet, setLiquidWallet] = useState<number>(0);
   const [transactions, setTransactions] = useState<WalletTransaction[]>([]);
 
   // Controles de la Billetera
@@ -126,6 +127,8 @@ export default function NexusWallstreetSaaS() {
 
   // Investment custom update state (per-investment input)
   const [invUpdateAmounts, setInvUpdateAmounts] = useState<Record<string, string>>({});
+  const [invReturnAmounts, setInvReturnAmounts] = useState<Record<string, string>>({});
+  const [invWithdrawAmounts, setInvWithdrawAmounts] = useState<Record<string, string>>({});
 
   // ==========================================
   // 🔄 CARGA DE DATOS DESDE LA BASE DE DATOS
@@ -173,9 +176,35 @@ export default function NexusWallstreetSaaS() {
   // ⚙️ 6. LÓGICA DE NEGOCIO (BILLETERA E INVERSIONES)
   // ==========================================
 
+  // ==========================================
+  // 💱 HELPER: Smart currency input (x1000 for integers < 1000)
+  // ==========================================
+  const parseSmartAmount = (raw: string): number => {
+    if (!raw) return 0;
+    let s = raw.trim().replace(/\s/g, '');
+    const lastDot = s.lastIndexOf('.');
+    const lastComma = s.lastIndexOf(',');
+    if (lastDot >= 0 && lastComma >= 0) {
+      if (lastComma > lastDot) {
+        s = s.replace(/\./g, '').replace(',', '.');
+      } else {
+        s = s.replace(/,/g, '');
+      }
+    } else if (lastComma >= 0) {
+      s = s.replace(',', '.');
+    }
+    const num = parseFloat(s);
+    if (isNaN(num) || num <= 0) return 0;
+    const hadDecimal = raw.includes('.') || raw.includes(',');
+    if (!hadDecimal && Number.isInteger(num) && num < 1000) {
+      return num * 1000;
+    }
+    return num;
+  };
+
   // Manejo de Billetera (Gastos Hormiga / Ingresos)
   const handleTransaction = async () => {
-    const amount = Number(txAmount);
+    const amount = parseSmartAmount(txAmount);
     if (!amount || amount <= 0) return;
 
     if (txType === "OUT" && amount > liquidWallet) {
@@ -204,9 +233,21 @@ export default function NexusWallstreetSaaS() {
     setTxAmount(""); setTxDesc("");
   };
 
+  // Eliminar Transacción (revierte el saldo)
+  const handleDeleteTransaction = async (txId: string) => {
+    if (!confirm('¿Eliminar este movimiento? El saldo será revertido.')) return;
+    try {
+      const result = await deleteTransaction(txId);
+      setLiquidWallet(result.liquidBalance);
+      setTransactions((prev) => prev.filter((t) => t.id !== txId));
+    } catch (e: unknown) {
+      alert(e instanceof Error ? e.message : "Error eliminando movimiento");
+    }
+  };
+
   // Crear Inversión (Saca de billetera, mete a fondo)
   const handleCreateInvestment = async () => {
-    const amount = Number(newInvAmount);
+    const amount = parseSmartAmount(newInvAmount);
     if (!newInvName || amount <= 0) return;
 
     if (amount > liquidWallet) {
@@ -244,7 +285,7 @@ export default function NexusWallstreetSaaS() {
   };
 
   // Actualizar Inversión (Validación de Dafuturo 200k)
-  const handleUpdateInvestmentAmount = async (invId: string, amountToChange: number, type: "ADD" | "WITHDRAW") => {
+  const handleUpdateInvestmentAmount = async (invId: string, amountToChange: number, type: "ADD" | "WITHDRAW" | "RETURN") => {
     try {
       const result = await updateInvestment({ investmentId: invId, amount: amountToChange, type });
       setLiquidWallet(result.liquidBalance);
@@ -304,7 +345,10 @@ export default function NexusWallstreetSaaS() {
         body: JSON.stringify({ message: userMessage }),
       });
       const data = await res.json();
-      setChatMessages((prev) => [...prev, { role: "ai", text: data.reply ?? "Sin respuesta." }]);
+      const aiText = res.ok
+        ? (data.reply ?? "Sin respuesta del modelo.")
+        : (data.error ? `⚠️ ${data.error}` : "Error desconocido del servidor.");
+      setChatMessages((prev) => [...prev, { role: "ai", text: aiText }]);
     } catch {
       setChatMessages((prev) => [...prev, { role: "ai", text: "Error conectando al asistente IA." }]);
     } finally {
@@ -359,10 +403,13 @@ export default function NexusWallstreetSaaS() {
           <div className="flex gap-2">
             <div className="relative flex-1">
               <span className="absolute left-3 top-2.5 text-gray-500 text-xs">$</span>
-              <input type="number" value={txAmount} onChange={(e) => setTxAmount(e.target.value)} placeholder="0.00" className="w-full bg-[#0A0A16] border border-white/10 rounded-lg py-2 pl-6 pr-2 text-xs text-white outline-none focus:border-[#00f0ff]" />
+              <input type="text" value={txAmount} onChange={(e) => setTxAmount(e.target.value)} placeholder="Ej: 50 = $50.000" className="w-full bg-[#0A0A16] border border-white/10 rounded-lg py-2 pl-6 pr-2 text-xs text-white outline-none focus:border-[#00f0ff]" />
             </div>
             <input type="text" value={txDesc} onChange={(e) => setTxDesc(e.target.value)} placeholder="Nota (Opcional)" className="flex-1 bg-[#0A0A16] border border-white/10 rounded-lg py-2 px-3 text-xs text-white outline-none focus:border-[#00f0ff]" />
           </div>
+          {txAmount && parseSmartAmount(txAmount) > 0 && (
+            <p className="text-[9px] text-[#00f0ff]/70 -mt-1 pl-1">= ${parseSmartAmount(txAmount).toLocaleString()}</p>
+          )}
           <button onClick={handleTransaction} className="w-full bg-[#00f0ff]/10 hover:bg-[#00f0ff]/20 text-[#00f0ff] border border-[#00f0ff]/30 py-2 rounded-lg text-xs font-bold transition-all uppercase tracking-widest">Registrar a Billetera</button>
         </div>
       </div>
@@ -398,9 +445,18 @@ export default function NexusWallstreetSaaS() {
                     <p className="text-xs text-white">{tx.description}</p>
                     <p className="text-[9px] text-gray-500">{new Date(tx.date).toLocaleDateString()}</p>
                   </div>
-                  <span className={`text-xs font-bold ${tx.type === 'IN' ? 'text-[#00ffaa]' : 'text-[#ff0055]'}`}>
-                    {tx.type === 'IN' ? '+' : '-'}${tx.amount.toLocaleString()}
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <span className={`text-xs font-bold ${tx.type === 'IN' ? 'text-[#00ffaa]' : 'text-[#ff0055]'}`}>
+                      {tx.type === 'IN' ? '+' : '-'}${tx.amount.toLocaleString()}
+                    </span>
+                    <button
+                      onClick={() => handleDeleteTransaction(tx.id)}
+                      className="text-gray-600 hover:text-[#ff0055] transition-colors"
+                      title="Eliminar movimiento"
+                    >
+                      <Trash2 size={12} />
+                    </button>
+                  </div>
                 </div>
               ))
             )}
@@ -544,28 +600,61 @@ export default function NexusWallstreetSaaS() {
               <AnimatePresence>
                 {expandedInvId === inv.id && (
                   <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden border-t border-white/10 mt-2 pt-4">
-                    <div className="flex gap-2 mb-4 items-center">
+                    {/* Invertir Más */}
+                    <div className="flex gap-2 mb-2 items-center">
                       <div className="relative flex-1">
                         <span className="absolute left-2 top-1.5 text-gray-500 text-[10px]">$</span>
                         <input
-                          type="number"
-                          min="0"
+                          type="text"
                           value={invUpdateAmounts[inv.id] ?? ""}
                           onChange={(e) => setInvUpdateAmounts(prev => ({ ...prev, [inv.id]: e.target.value }))}
-                          placeholder="Monto"
+                          placeholder="Ej: 50 = $50k"
                           className="w-full bg-[#05050A] border border-white/10 rounded-lg py-1.5 pl-5 pr-2 text-[10px] text-white outline-none focus:border-[#00f0ff]"
                         />
                       </div>
                       <button
-                        disabled={!invUpdateAmounts[inv.id] || Number(invUpdateAmounts[inv.id]) <= 0}
-                        onClick={() => handleUpdateInvestmentAmount(inv.id, Number(invUpdateAmounts[inv.id]), "ADD")}
+                        disabled={!invUpdateAmounts[inv.id] || parseSmartAmount(invUpdateAmounts[inv.id]) <= 0}
+                        onClick={() => handleUpdateInvestmentAmount(inv.id, parseSmartAmount(invUpdateAmounts[inv.id]), "ADD")}
                         className="flex-1 bg-[#00ffaa]/10 text-[#00ffaa] border border-[#00ffaa]/30 text-[10px] py-1.5 rounded flex items-center justify-center gap-1 disabled:opacity-40 disabled:cursor-not-allowed"
                       >
-                        <Plus size={10} /> Inyectar
+                        <Plus size={10} /> Invertir Más
                       </button>
+                    </div>
+                    {/* Registrar Rendimiento */}
+                    <div className="flex gap-2 mb-2 items-center">
+                      <div className="relative flex-1">
+                        <span className="absolute left-2 top-1.5 text-gray-500 text-[10px]">$</span>
+                        <input
+                          type="number"
+                          value={invReturnAmounts[inv.id] ?? ""}
+                          onChange={(e) => setInvReturnAmounts(prev => ({ ...prev, [inv.id]: e.target.value }))}
+                          placeholder="Exacto: ej +2000 o -37"
+                          className="w-full bg-[#05050A] border border-white/10 rounded-lg py-1.5 pl-5 pr-2 text-[10px] text-white outline-none focus:border-[#00f0ff]"
+                        />
+                      </div>
                       <button
-                        disabled={!invUpdateAmounts[inv.id] || Number(invUpdateAmounts[inv.id]) <= 0}
-                        onClick={() => handleUpdateInvestmentAmount(inv.id, Number(invUpdateAmounts[inv.id]), "WITHDRAW")}
+                        disabled={!invReturnAmounts[inv.id] || Number(invReturnAmounts[inv.id]) === 0}
+                        onClick={() => handleUpdateInvestmentAmount(inv.id, Number(invReturnAmounts[inv.id]), "RETURN")}
+                        className="flex-1 bg-[#7000ff]/10 text-[#7000ff] border border-[#7000ff]/30 text-[10px] py-1.5 rounded flex items-center justify-center gap-1 disabled:opacity-40 disabled:cursor-not-allowed"
+                      >
+                        {Number(invReturnAmounts[inv.id]) > 0 ? <TrendingUp size={10} /> : <TrendingDown size={10} />} Rendimiento
+                      </button>
+                    </div>
+                    {/* Retirar */}
+                    <div className="flex gap-2 mb-4 items-center">
+                      <div className="relative flex-1">
+                        <span className="absolute left-2 top-1.5 text-gray-500 text-[10px]">$</span>
+                        <input
+                          type="text"
+                          value={invWithdrawAmounts[inv.id] ?? ""}
+                          onChange={(e) => setInvWithdrawAmounts(prev => ({ ...prev, [inv.id]: e.target.value }))}
+                          placeholder="Monto a retirar"
+                          className="w-full bg-[#05050A] border border-white/10 rounded-lg py-1.5 pl-5 pr-2 text-[10px] text-white outline-none focus:border-[#00f0ff]"
+                        />
+                      </div>
+                      <button
+                        disabled={!invWithdrawAmounts[inv.id] || parseSmartAmount(invWithdrawAmounts[inv.id]) <= 0}
+                        onClick={() => handleUpdateInvestmentAmount(inv.id, parseSmartAmount(invWithdrawAmounts[inv.id]), "WITHDRAW")}
                         className="flex-1 bg-[#ff0055]/10 text-[#ff0055] border border-[#ff0055]/30 text-[10px] py-1.5 rounded flex items-center justify-center gap-1 disabled:opacity-40 disabled:cursor-not-allowed"
                       >
                         <Minus size={10} /> Retirar
@@ -661,7 +750,10 @@ export default function NexusWallstreetSaaS() {
                 <div className="flex gap-4">
                   <div className="flex-1">
                     <label className="text-[10px] text-gray-500 uppercase">Monto Inicial (Se resta de Liquidez)</label>
-                    <input type="number" value={newInvAmount} onChange={(e) => setNewInvAmount(e.target.value)} placeholder="0.00" className="w-full bg-[#05050A] border border-white/10 rounded-lg p-3 text-sm text-white focus:border-[#00f0ff] outline-none mt-1" />
+                    <input type="text" value={newInvAmount} onChange={(e) => setNewInvAmount(e.target.value)} placeholder="Ej: 350 = $350k" className="w-full bg-[#05050A] border border-white/10 rounded-lg p-3 text-sm text-white focus:border-[#00f0ff] outline-none mt-1" />
+                    {newInvAmount && parseSmartAmount(newInvAmount) > 0 && (
+                      <p className="text-[9px] text-[#00f0ff]/70 mt-1">= ${parseSmartAmount(newInvAmount).toLocaleString()}</p>
+                    )}
                   </div>
                   <div>
                     <label className="text-[10px] text-gray-500 uppercase">Color</label>
@@ -845,10 +937,10 @@ export default function NexusWallstreetSaaS() {
           {/* Logo */}
           <div className="flex flex-col items-center gap-3">
             <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-[#00f0ff] to-[#7000ff] flex items-center justify-center font-black text-black text-2xl shadow-[0_0_30px_rgba(0,240,255,0.3)]">
-              N
+              T
             </div>
             <div className="text-center">
-              <h1 className="text-2xl font-black tracking-widest uppercase text-white">Nexus SaaS</h1>
+              <h1 className="text-2xl font-black tracking-widest uppercase text-white">Thomás-corp</h1>
               <p className="text-xs text-gray-500 mt-1 uppercase tracking-widest">Dashboard Financiero Inteligente</p>
             </div>
           </div>
@@ -891,8 +983,8 @@ export default function NexusWallstreetSaaS() {
       {/* 🔮 SIDEBAR (Navegación entre los 3 grandes módulos) */}
       <nav className="hidden sm:flex flex-col w-64 border-r border-white/5 bg-[#0A0A16]/50 p-4 z-20 gap-6">
         <div className="flex items-center gap-3 mb-8">
-          <div className="w-8 h-8 rounded bg-gradient-to-br from-[#00f0ff] to-[#7000ff] flex items-center justify-center font-bold text-black">N</div>
-          <span className="font-bold tracking-widest uppercase text-sm">Nexus SaaS</span>
+          <div className="w-8 h-8 rounded bg-gradient-to-br from-[#00f0ff] to-[#7000ff] flex items-center justify-center font-bold text-black">T</div>
+          <span className="font-bold tracking-widest uppercase text-sm">Thomás-corp</span>
         </div>
 
         <div className="flex flex-col gap-2">
