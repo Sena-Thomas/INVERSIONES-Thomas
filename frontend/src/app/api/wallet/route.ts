@@ -14,7 +14,7 @@ export async function GET() {
     try {
         let profile = await prisma.userProfile.findUnique({ where: { userId } });
         if (!profile) {
-            profile = await prisma.userProfile.create({ data: { userId, liquidBalance: 300000 } });
+            profile = await prisma.userProfile.create({ data: { userId, liquidBalance: 0 } });
         }
 
         const transactions = await prisma.walletTransaction.findMany({

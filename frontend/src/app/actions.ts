@@ -21,11 +21,11 @@ async function getAuthUserId(): Promise<string> {
 export async function getDashboardData() {
   const userId = await getAuthUserId();
 
-  // Busca o crea el perfil del usuario con saldo inicial de 300k
+  // Busca o crea el perfil del usuario con saldo inicial de $0
   let profile = await prisma.userProfile.findUnique({ where: { userId } });
   if (!profile) {
     profile = await prisma.userProfile.create({
-      data: { userId, liquidBalance: 300000 },
+      data: { userId, liquidBalance: 0 },
     });
   }
 
