@@ -1,0 +1,1316 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Giga-Terminal | Financial Dashboard</title>
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+  <!-- FontAwesome -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" />
+
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            'gt-bg':      '#0a0a0f',
+            'gt-surface': '#12121a',
+            'gt-card':    '#1a1a28',
+            'gt-border':  '#2a2a3f',
+            'gt-green':   '#00ff88',
+            'gt-red':     '#ff4466',
+            'gt-blue':    '#00aaff',
+            'gt-gold':    '#ffd700',
+            'gt-purple':  '#8844ff',
+            'gt-muted':   '#6666aa',
+          }
+        }
+      }
+    };
+  </script>
+
+  <style>
+    /* ── base ── */
+    *, *::before, *::after { box-sizing: border-box; }
+    body {
+      background: #0a0a0f;
+      color: #e0e0ff;
+      font-family: 'Courier New', Courier, monospace;
+      min-height: 100vh;
+    }
+
+    /* ── cards ── */
+    .gt-card {
+      background: #1a1a28;
+      border: 1px solid #2a2a3f;
+      border-radius: 12px;
+    }
+    .gt-card:hover { border-color: #3a3a5f; }
+
+    /* ── inputs ── */
+    .gt-input {
+      background: #0a0a0f;
+      border: 1px solid #2a2a3f;
+      color: #e0e0ff;
+      border-radius: 8px;
+      padding: 8px 12px;
+      width: 100%;
+      font-family: inherit;
+      font-size: 14px;
+      transition: border-color .2s;
+    }
+    .gt-input:focus  { outline: none; border-color: #00ff88; }
+    .gt-input.error  { border-color: #ff4466; }
+    .gt-input::placeholder { color: #4a4a6a; }
+    select.gt-input option { background: #1a1a28; }
+
+    /* ── buttons ── */
+    .btn-primary {
+      background: linear-gradient(135deg, #00ff88, #00aaff);
+      color: #0a0a0f;
+      font-weight: 700;
+      cursor: pointer;
+      transition: opacity .2s, transform .1s;
+    }
+    .btn-primary:hover  { opacity: .85; }
+    .btn-primary:active { transform: scale(.97); }
+
+    .btn-danger {
+      background: rgba(255,68,102,.15);
+      color: #ff4466;
+      border: 1px solid rgba(255,68,102,.3);
+      cursor: pointer;
+      transition: background .2s;
+    }
+    .btn-danger:hover  { background: rgba(255,68,102,.3); }
+
+    .btn-ghost {
+      background: transparent;
+      color: #6666aa;
+      border: 1px solid #2a2a3f;
+      cursor: pointer;
+      transition: color .2s, border-color .2s;
+    }
+    .btn-ghost:hover { color: #e0e0ff; border-color: #5a5a8f; }
+
+    /* ── nav tabs ── */
+    .nav-tab {
+      padding: 12px 8px;
+      font-size: 14px;
+      font-weight: 600;
+      color: #6666aa;
+      border-bottom: 2px solid transparent;
+      cursor: pointer;
+      transition: color .2s, border-color .2s;
+      background: none;
+      border-left: none;
+      border-right: none;
+      border-top: none;
+      white-space: nowrap;
+    }
+    .nav-tab:hover { color: #c0c0ff; }
+    .nav-tab.active { color: #00ff88; border-bottom-color: #00ff88; }
+
+    /* ── modals ── */
+    .modal-overlay {
+      background: rgba(0,0,0,.8);
+      backdrop-filter: blur(4px);
+    }
+
+    /* ── badges ── */
+    .badge-green { background: rgba(0,255,136,.15); color: #00ff88; border: 1px solid rgba(0,255,136,.3); }
+    .badge-red   { background: rgba(255,68,102,.15); color: #ff4466; border: 1px solid rgba(255,68,102,.3); }
+    .badge-blue  { background: rgba(0,170,255,.15);  color: #00aaff; border: 1px solid rgba(0,170,255,.3); }
+    .badge-gold  { background: rgba(255,215,0,.15);  color: #ffd700; border: 1px solid rgba(255,215,0,.3); }
+
+    /* ── numbers ── */
+    .up   { color: #00ff88; }
+    .down { color: #ff4466; }
+
+    /* ── investment borders ── */
+    .inv-passive { border-left: 3px solid #00aaff; }
+    .inv-active  { border-left: 3px solid #ffd700; }
+
+    /* ── FAB pulse ── */
+    .fab {
+      position: fixed;
+      bottom: 2rem;
+      right: 2rem;
+      width: 3.5rem;
+      height: 3.5rem;
+      border-radius: 9999px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.5rem;
+      z-index: 30;
+      box-shadow: 0 0 0 0 rgba(0,255,136,.4);
+      animation: fabPulse 2.5s infinite;
+    }
+    @keyframes fabPulse {
+      0%,100% { box-shadow: 0 0 0 0 rgba(0,255,136,.4); }
+      50%      { box-shadow: 0 0 0 14px rgba(0,255,136,0); }
+    }
+
+    /* ── scrollbars ── */
+    ::-webkit-scrollbar       { width: 4px; height: 4px; }
+    ::-webkit-scrollbar-track { background: #0a0a0f; }
+    ::-webkit-scrollbar-thumb { background: #2a2a3f; border-radius: 2px; }
+
+    /* ── liquid toggle ── */
+    .toggle-track {
+      width: 44px; height: 24px;
+      border-radius: 12px;
+      position: relative;
+      cursor: pointer;
+      transition: background .3s;
+    }
+    .toggle-thumb {
+      position: absolute;
+      top: 3px; left: 3px;
+      width: 18px; height: 18px;
+      border-radius: 50%;
+      background: #fff;
+      transition: transform .3s;
+    }
+    .toggle-track.on  { background: #00ff88; }
+    .toggle-track.off { background: #ff4466; }
+    .toggle-track.on  .toggle-thumb { transform: translateX(20px); }
+
+    /* ── capital neto glow ── */
+    #capitalNeto {
+      text-shadow: 0 0 24px rgba(0,255,136,.6);
+      transition: all .4s;
+    }
+
+    /* ── spinner ── */
+    .spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid rgba(0,255,136,.3); border-top-color: #00ff88; border-radius: 50%; animation: spin .7s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+
+<body>
+
+<!-- ════════════════════════════════════════
+     HEADER
+════════════════════════════════════════ -->
+<header id="app-header" class="sticky top-0 z-40 border-b border-gt-border"
+        style="background: rgba(10,10,15,.96); backdrop-filter: blur(12px);">
+
+  <div class="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between gap-4">
+
+    <!-- Logo -->
+    <div class="flex items-center gap-3 shrink-0">
+      <div class="w-8 h-8 rounded-lg flex items-center justify-center"
+           style="background: linear-gradient(135deg,#00ff88,#00aaff);">
+        <i class="fas fa-bolt text-black text-sm"></i>
+      </div>
+      <span class="font-bold text-base tracking-widest hidden sm:block"
+            style="color:#00ff88;">GIGA<span class="text-white">-TERMINAL</span></span>
+    </div>
+
+    <!-- Capital Neto (prominently top-right) -->
+    <div class="text-right">
+      <div class="text-xs text-gt-muted uppercase tracking-wider mb-0.5">Capital Neto Total</div>
+      <div id="capitalNeto" class="text-2xl sm:text-3xl font-bold up">$0</div>
+      <div class="text-xs text-gt-muted mt-0.5 flex gap-3 justify-end flex-wrap">
+        <span><i class="fas fa-wallet mr-1" style="color:#00aaff;"></i>
+          <span id="hdrWallet" class="text-gt-blue">$0</span>
+        </span>
+        <span><i class="fas fa-chart-line mr-1" style="color:#ffd700;"></i>
+          <span id="hdrInv" class="text-gt-gold">$0</span>
+        </span>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Nav tabs -->
+  <div class="max-w-7xl mx-auto px-4 flex gap-4 border-t border-gt-border overflow-x-auto">
+    <button class="nav-tab active" id="tab-btn-estado"
+            onclick="switchTab('estado')">
+      <i class="fas fa-chart-line mr-1.5"></i>Mi Estado
+    </button>
+    <button class="nav-tab" id="tab-btn-inversiones"
+            onclick="switchTab('inversiones')">
+      <i class="fas fa-coins mr-1.5"></i>Inversiones
+    </button>
+    <button class="nav-tab" id="tab-btn-mercado"
+            onclick="switchTab('mercado')">
+      <i class="fas fa-magnifying-glass-chart mr-1.5"></i>Market Explorer
+    </button>
+  </div>
+
+</header>
+
+<!-- ════════════════════════════════════════
+     MAIN CONTENT
+════════════════════════════════════════ -->
+<main class="max-w-7xl mx-auto px-4 py-6">
+
+  <!-- ─────────────────────────────────────
+       TAB 1 · MI ESTADO
+  ───────────────────────────────────── -->
+  <section id="tab-estado">
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+      <!-- BILLETERA CARD -->
+      <div class="gt-card p-5 flex flex-col">
+
+        <div class="flex items-center justify-between mb-4">
+          <h3 class="font-bold text-sm uppercase tracking-wider text-gt-muted">
+            <i class="fas fa-wallet mr-2 text-gt-blue"></i>Billetera
+          </h3>
+          <span class="badge-green text-xs px-2 py-0.5 rounded-full">Gastos Hormiga</span>
+        </div>
+
+        <div id="walletBalance" class="text-3xl font-bold up mb-0.5">$0</div>
+        <div class="text-xs text-gt-muted mb-5">Saldo disponible</div>
+
+        <!-- Action buttons -->
+        <div class="flex gap-2 mb-5">
+          <button onclick="openWalletModal('INGRESO')"
+                  class="flex-1 py-2 rounded-lg text-sm font-bold badge-green hover:opacity-80 transition-opacity">
+            <i class="fas fa-plus mr-1"></i>Ingresar
+          </button>
+          <button onclick="openWalletModal('GASTO')"
+                  class="flex-1 py-2 rounded-lg text-sm font-bold badge-red hover:opacity-80 transition-opacity">
+            <i class="fas fa-minus mr-1"></i>Gasto
+          </button>
+        </div>
+
+        <!-- Recent movements -->
+        <div class="text-xs text-gt-muted uppercase tracking-wider mb-2">Últimos movimientos</div>
+        <div id="transactionsList" class="space-y-1.5 max-h-52 overflow-y-auto flex-1">
+          <div class="text-center text-gt-muted text-sm py-6">
+            <span class="spinner"></span>
+          </div>
+        </div>
+
+      </div><!-- /billetera -->
+
+      <!-- CHARTS (2-col span) -->
+      <div class="lg:col-span-2 space-y-5">
+
+        <!-- Capital evolution -->
+        <div class="gt-card p-5">
+          <h3 class="font-bold text-sm uppercase tracking-wider text-gt-muted mb-4">
+            <i class="fas fa-chart-area mr-2 up"></i>Evolución del Capital
+          </h3>
+          <canvas id="capitalChart" height="110"></canvas>
+        </div>
+
+        <!-- Income / Expense summary -->
+        <div class="gt-card p-5">
+          <h3 class="font-bold text-sm uppercase tracking-wider text-gt-muted mb-4">
+            <i class="fas fa-scale-balanced mr-2 text-gt-gold"></i>Ingresos vs Gastos
+          </h3>
+          <canvas id="incomeExpenseChart" height="90"></canvas>
+        </div>
+
+      </div><!-- /charts col -->
+
+    </div><!-- /grid row 1 -->
+
+    <!-- Row 2: Distribution + AI -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
+
+      <!-- Donut distribution -->
+      <div class="gt-card p-5">
+        <h3 class="font-bold text-sm uppercase tracking-wider text-gt-muted mb-4">
+          <i class="fas fa-circle-half-stroke mr-2 text-gt-purple"></i>Distribución de Inversiones
+        </h3>
+        <div class="flex items-center gap-5">
+          <div style="width:180px;height:180px;flex-shrink:0;">
+            <canvas id="distributionChart" width="180" height="180"></canvas>
+          </div>
+          <div id="distributionLegend" class="flex-1 space-y-2 text-sm min-w-0 overflow-hidden">
+            <div class="text-gt-muted text-sm">Sin inversiones</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- AI Advisor -->
+      <div class="gt-card p-5 flex flex-col">
+        <div class="flex items-center justify-between mb-4">
+          <h3 class="font-bold text-sm uppercase tracking-wider text-gt-muted">
+            <i class="fas fa-robot mr-2 text-gt-purple"></i>Giga.IA Advisor
+          </h3>
+          <button id="aiBtn" onclick="askAI()"
+                  class="text-xs px-3 py-1 rounded-full font-bold transition-opacity"
+                  style="background:rgba(136,68,255,.2);color:#8844ff;border:1px solid rgba(136,68,255,.4);">
+            <i class="fas fa-wand-magic-sparkles mr-1"></i>Analizar
+          </button>
+        </div>
+
+        <div id="aiResponse"
+             class="text-sm text-gt-muted leading-relaxed flex-1 min-h-20 overflow-y-auto">
+          Haz clic en <strong class="text-gt-purple">Analizar</strong> para obtener
+          recomendaciones personalizadas basadas en tu portafolio actual…
+        </div>
+
+        <!-- Quick questions -->
+        <div class="flex flex-wrap gap-2 mt-4 pt-4 border-t border-gt-border">
+          <button onclick="quickAI('¿Cómo mejorar mi portafolio?')"
+                  class="btn-ghost text-xs px-2 py-1 rounded">
+            💡 Mejorar portafolio
+          </button>
+          <button onclick="quickAI('¿Debo diversificar más?')"
+                  class="btn-ghost text-xs px-2 py-1 rounded">
+            📊 Diversificar
+          </button>
+          <button onclick="quickAI('¿Cuál es mi nivel de riesgo financiero?')"
+                  class="btn-ghost text-xs px-2 py-1 rounded">
+            ⚠️ Riesgo
+          </button>
+        </div>
+
+      </div><!-- /ai -->
+
+    </div><!-- /row 2 -->
+
+  </section><!-- /tab-estado -->
+
+
+  <!-- ─────────────────────────────────────
+       TAB 2 · INVERSIONES
+  ───────────────────────────────────── -->
+  <section id="tab-inversiones" style="display:none;">
+
+    <!-- Comparative chart -->
+    <div class="gt-card p-5 mb-6">
+      <h3 class="font-bold text-sm uppercase tracking-wider text-gt-muted mb-4">
+        <i class="fas fa-chart-bar mr-2 text-gt-gold"></i>Comparativa de Rendimiento
+      </h3>
+      <canvas id="comparativeChart" height="100"></canvas>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+      <!-- PASSIVE -->
+      <div>
+        <div class="flex items-center justify-between mb-4">
+          <h3 class="font-bold text-sm uppercase tracking-wider text-gt-blue">
+            <i class="fas fa-lock mr-2"></i>Inversiones Pasivas
+          </h3>
+          <span class="text-xs text-gt-muted">CDTs · DaFuturo · Fondos</span>
+        </div>
+        <div id="passiveList" class="space-y-3">
+          <div class="text-center text-gt-muted text-sm py-10"><span class="spinner"></span></div>
+        </div>
+      </div>
+
+      <!-- ACTIVE -->
+      <div>
+        <div class="flex items-center justify-between mb-4">
+          <h3 class="font-bold text-sm uppercase tracking-wider text-gt-gold">
+            <i class="fas fa-rocket mr-2"></i>Inversiones Activas
+          </h3>
+          <span class="text-xs text-gt-muted">ETFs · Acciones · Cripto</span>
+        </div>
+        <div id="activeList" class="space-y-3">
+          <div class="text-center text-gt-muted text-sm py-10"><span class="spinner"></span></div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- FAB -->
+    <button onclick="openInvModal()" class="fab btn-primary" title="Nueva inversión">
+      <i class="fas fa-plus text-black text-xl"></i>
+    </button>
+
+  </section><!-- /tab-inversiones -->
+
+
+  <!-- ─────────────────────────────────────
+       TAB 3 · MARKET EXPLORER
+  ───────────────────────────────────── -->
+  <section id="tab-mercado" style="display:none;">
+
+    <!-- Search bar -->
+    <div class="gt-card p-5 mb-5">
+      <h3 class="font-bold text-sm uppercase tracking-wider text-gt-muted mb-4">
+        <i class="fas fa-magnifying-glass mr-2 text-gt-blue"></i>Explorador de Mercado
+      </h3>
+      <div class="flex gap-3">
+        <input id="tickerSearch" type="text"
+               placeholder="Ticker: SPY, AAPL, BTC-USD…"
+               class="gt-input flex-1"
+               onkeydown="if(event.key==='Enter')searchTicker()" />
+        <button onclick="searchTicker()"
+                class="btn-primary px-5 py-2 rounded-lg text-sm font-bold whitespace-nowrap">
+          <i class="fas fa-bolt mr-1"></i>Buscar
+        </button>
+      </div>
+    </div>
+
+    <!-- Asset result -->
+    <div id="assetResult" class="gt-card p-5 mb-5" style="display:none;">
+      <div class="flex items-start justify-between gap-4 flex-wrap">
+        <div>
+          <div id="assetName" class="text-2xl font-bold text-gt-gold"></div>
+          <div id="assetSubtitle" class="text-xs text-gt-muted mt-1">Cotización en tiempo real</div>
+        </div>
+        <div class="text-right">
+          <div id="assetPrice" class="text-3xl font-bold up"></div>
+          <div class="text-xs text-gt-muted mt-0.5">Precio actual (USD)</div>
+        </div>
+      </div>
+      <div class="mt-4 grid grid-cols-2 gap-4">
+        <div class="p-3 rounded-lg" style="background:#0a0a0f;border:1px solid #2a2a3f;">
+          <div class="text-xs text-gt-muted mb-0.5">SMA 20 días</div>
+          <div id="assetSma" class="font-bold text-gt-blue"></div>
+        </div>
+        <div class="p-3 rounded-lg" style="background:#0a0a0f;border:1px solid #2a2a3f;">
+          <div class="text-xs text-gt-muted mb-0.5">Tendencia</div>
+          <div id="assetTrend" class="font-bold"></div>
+        </div>
+      </div>
+      <button onclick="addAssetToPortfolio()"
+              class="btn-primary mt-4 px-4 py-2 rounded-lg text-sm font-bold">
+        <i class="fas fa-plus mr-2"></i>Agregar a Inversiones Activas
+      </button>
+    </div>
+
+    <!-- Popular assets grid -->
+    <div class="gt-card p-5">
+      <h3 class="font-bold text-sm uppercase tracking-wider text-gt-muted mb-4">
+        <i class="fas fa-fire mr-2 text-gt-red"></i>ETFs &amp; Activos Populares
+      </h3>
+      <div id="popularGrid"
+           class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
+      </div>
+    </div>
+
+  </section><!-- /tab-mercado -->
+
+</main>
+
+
+<!-- ════════════════════════════════════════
+     WALLET MODAL
+════════════════════════════════════════ -->
+<div id="walletModal"
+     class="fixed inset-0 z-50 flex items-center justify-center modal-overlay"
+     style="display:none;"
+     onclick="if(event.target===this)closeWalletModal()">
+  <div class="gt-card p-6 w-full max-w-sm mx-4">
+
+    <div class="flex items-center justify-between mb-5">
+      <h3 id="walletModalTitle" class="font-bold text-lg">Agregar Ingreso</h3>
+      <button onclick="closeWalletModal()" class="text-gt-muted hover:text-white transition-colors text-xl">
+        <i class="fas fa-xmark"></i>
+      </button>
+    </div>
+
+    <div class="space-y-4">
+      <div>
+        <label class="text-xs text-gt-muted uppercase tracking-wider mb-1 block">Monto *</label>
+        <input id="walletAmount" type="number" min="0.01" step="0.01"
+               placeholder="0.00" class="gt-input text-xl font-bold" />
+        <p id="walletAmountErr" class="text-xs down mt-1" style="display:none;">Ingresa un monto válido mayor a 0.</p>
+      </div>
+      <div>
+        <label class="text-xs text-gt-muted uppercase tracking-wider mb-1 block">Descripción</label>
+        <input id="walletDesc" type="text"
+               placeholder="ej: salario, café, transporte…" class="gt-input" />
+      </div>
+    </div>
+
+    <div class="flex gap-3 mt-6">
+      <button onclick="closeWalletModal()"
+              class="btn-ghost flex-1 py-2 rounded-lg text-sm font-semibold">
+        Cancelar
+      </button>
+      <button id="walletSubmitBtn" onclick="submitWallet()"
+              class="btn-primary flex-1 py-2 rounded-lg text-sm">
+        Confirmar
+      </button>
+    </div>
+
+  </div>
+</div>
+
+
+<!-- ════════════════════════════════════════
+     INVESTMENT MODAL
+════════════════════════════════════════ -->
+<div id="invModal"
+     class="fixed inset-0 z-50 flex items-center justify-center modal-overlay"
+     style="display:none;"
+     onclick="if(event.target===this)closeInvModal()">
+  <div class="gt-card p-6 w-full max-w-md mx-4 max-h-screen overflow-y-auto">
+
+    <div class="flex items-center justify-between mb-5">
+      <h3 class="font-bold text-lg">Nueva Inversión</h3>
+      <button onclick="closeInvModal()" class="text-gt-muted hover:text-white transition-colors text-xl">
+        <i class="fas fa-xmark"></i>
+      </button>
+    </div>
+
+    <!-- Type toggle -->
+    <div class="flex gap-2 mb-5 p-1 rounded-lg" style="background:#0a0a0f;">
+      <button id="btnTypePasiva" onclick="setInvType('PASIVA')"
+              class="flex-1 py-2 rounded-lg text-sm font-bold transition-all badge-blue">
+        <i class="fas fa-lock mr-1"></i>Pasiva
+      </button>
+      <button id="btnTypeActiva" onclick="setInvType('ACTIVA')"
+              class="flex-1 py-2 rounded-lg text-sm font-bold transition-all btn-ghost">
+        <i class="fas fa-rocket mr-1"></i>Activa
+      </button>
+    </div>
+
+    <div class="space-y-4">
+
+      <div>
+        <label class="text-xs text-gt-muted uppercase tracking-wider mb-1 block">Nombre / Ticker *</label>
+        <input id="invName" type="text" placeholder="ej: DaFuturo, SPY, AAPL…" class="gt-input" />
+        <p id="invNameErr" class="text-xs down mt-1" style="display:none;">El nombre es obligatorio.</p>
+      </div>
+
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="text-xs text-gt-muted uppercase tracking-wider mb-1 block">Monto Invertido *</label>
+          <input id="invAmount" type="number" min="0" step="0.01"
+                 placeholder="0.00" class="gt-input" />
+          <p id="invAmountErr" class="text-xs down mt-1" style="display:none;">Ingresa un monto mayor a 0.</p>
+        </div>
+        <div>
+          <label class="text-xs text-gt-muted uppercase tracking-wider mb-1 block">Valor Actual</label>
+          <input id="invCurrentVal" type="number" min="0" step="0.01"
+                 placeholder="Igual al invertido" class="gt-input" />
+        </div>
+      </div>
+
+      <!-- Color picker -->
+      <div>
+        <label class="text-xs text-gt-muted uppercase tracking-wider mb-2 block">Color en gráficas</label>
+        <div class="flex items-center gap-3 flex-wrap">
+          <input id="invColor" type="color" value="#00ff88"
+                 class="w-10 h-10 rounded cursor-pointer border-0 bg-transparent" />
+          <div class="flex gap-2 flex-wrap">
+            <button type="button" title="#00ff88"
+                    onclick="document.getElementById('invColor').value='#00ff88'"
+                    class="w-6 h-6 rounded-full border-2 border-gt-border hover:scale-110 transition-transform"
+                    style="background:#00ff88;"></button>
+            <button type="button" title="#00aaff"
+                    onclick="document.getElementById('invColor').value='#00aaff'"
+                    class="w-6 h-6 rounded-full border-2 border-gt-border hover:scale-110 transition-transform"
+                    style="background:#00aaff;"></button>
+            <button type="button" title="#ffd700"
+                    onclick="document.getElementById('invColor').value='#ffd700'"
+                    class="w-6 h-6 rounded-full border-2 border-gt-border hover:scale-110 transition-transform"
+                    style="background:#ffd700;"></button>
+            <button type="button" title="#ff4466"
+                    onclick="document.getElementById('invColor').value='#ff4466'"
+                    class="w-6 h-6 rounded-full border-2 border-gt-border hover:scale-110 transition-transform"
+                    style="background:#ff4466;"></button>
+            <button type="button" title="#8844ff"
+                    onclick="document.getElementById('invColor').value='#8844ff'"
+                    class="w-6 h-6 rounded-full border-2 border-gt-border hover:scale-110 transition-transform"
+                    style="background:#8844ff;"></button>
+            <button type="button" title="#ff8800"
+                    onclick="document.getElementById('invColor').value='#ff8800'"
+                    class="w-6 h-6 rounded-full border-2 border-gt-border hover:scale-110 transition-transform"
+                    style="background:#ff8800;"></button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Passive-only options -->
+      <div id="passiveOptions" class="space-y-3">
+
+        <!-- Liquid toggle -->
+        <div class="flex items-center justify-between p-3 rounded-lg"
+             style="background:#0a0a0f;border:1px solid #2a2a3f;">
+          <div>
+            <div class="text-sm font-semibold">¿Liquidez disponible?</div>
+            <div class="text-xs text-gt-muted">
+              <span class="up">Verde</span> = líquido &nbsp;·&nbsp;
+              <span class="down">Rojo</span> = bloqueado
+            </div>
+          </div>
+          <div id="liquidToggle" class="toggle-track on" onclick="toggleLiquid()">
+            <div class="toggle-thumb"></div>
+          </div>
+        </div>
+
+        <div>
+          <label class="text-xs text-gt-muted uppercase tracking-wider mb-1 block">
+            Balance mínimo (bloqueo parcial)
+          </label>
+          <input id="invMinBalance" type="number" min="0" step="0.01"
+                 placeholder="0.00" value="0" class="gt-input" />
+        </div>
+
+      </div><!-- /passiveOptions -->
+
+    </div><!-- /space-y-4 -->
+
+    <div class="flex gap-3 mt-6">
+      <button onclick="closeInvModal()"
+              class="btn-ghost flex-1 py-2 rounded-lg text-sm font-semibold">
+        Cancelar
+      </button>
+      <button onclick="submitInvestment()"
+              class="btn-primary flex-1 py-2 rounded-lg text-sm">
+        <i class="fas fa-rocket mr-1"></i>Crear Inversión
+      </button>
+    </div>
+
+  </div>
+</div>
+
+
+<!-- ════════════════════════════════════════
+     VANILLA JS — APP LOGIC
+════════════════════════════════════════ -->
+<script>
+'use strict';
+
+// ─── Config ───────────────────────────────
+const API = '';   // same origin — relative paths, e.g. /api/...
+
+// ─── App State ────────────────────────────
+const S = {
+  capitalNeto : 0,
+  wallet      : { saldo_billetera: 0, movimientos: [] },
+  investments : [],
+  walletType  : 'INGRESO',
+  invType     : 'PASIVA',
+  invLiquid   : true,
+  currentAsset: null,
+  charts      : {},
+};
+
+// ─── Formatters ───────────────────────────
+function fmt(n) {
+  if (n === null || n === undefined) return '$0';
+  const a = Math.abs(n);
+  const sign = n < 0 ? '-' : '';
+  if (a >= 1_000_000) return sign + '$' + (a / 1_000_000).toFixed(2) + 'M';
+  if (a >= 1_000)     return sign + '$' + (a / 1_000).toFixed(1) + 'k';
+  return (n < 0 ? '-$' : '$') + a.toFixed(2);
+}
+
+function fmtDate(d) {
+  if (!d) return '';
+  const date = new Date(d);
+  if (isNaN(date.getTime())) return '';
+  return date.toLocaleDateString('es-CO', { day: '2-digit', month: 'short' });
+}
+
+// ─── API helpers ──────────────────────────
+async function apiFetch(path, opts = {}) {
+  const res = await fetch(API + path, opts);
+  if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+  return res.json();
+}
+
+async function loadCapitalNeto() {
+  try {
+    const d = await apiFetch('/api/capital-neto');
+    S.capitalNeto = d.capital_neto_total;
+    document.getElementById('capitalNeto').textContent = fmt(d.capital_neto_total);
+    document.getElementById('hdrWallet').textContent   = fmt(d.desglose.billetera);
+    document.getElementById('hdrInv').textContent      = fmt(d.desglose.inversiones);
+  } catch (e) {
+    document.getElementById('capitalNeto').textContent = 'Error';
+    console.error('[capital-neto]', e);
+  }
+}
+
+async function loadWallet() {
+  try {
+    const d = await apiFetch('/api/wallet');
+    S.wallet = d;
+    renderWallet(d);
+  } catch (e) { console.error('[wallet]', e); }
+}
+
+async function loadInvestments() {
+  try {
+    const d = await apiFetch('/api/investments');
+    S.investments = Array.isArray(d) ? d : [];
+    renderInvestmentLists(S.investments);
+    renderDistribution(S.investments);
+    renderComparative(S.investments);
+  } catch (e) { console.error('[investments]', e); }
+}
+
+async function postWallet(type, amount, description) {
+  return apiFetch('/api/wallet', {
+    method : 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body   : JSON.stringify({ type, amount: parseFloat(amount), description: description || 'Movimiento General' }),
+  });
+}
+
+async function postInvestment(payload) {
+  return apiFetch('/api/investments', {
+    method : 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body   : JSON.stringify(payload),
+  });
+}
+
+async function deleteInvestmentById(id) {
+  return apiFetch(`/api/investments/${id}`, { method: 'DELETE' });
+}
+
+async function fetchAsset(ticker) {
+  return apiFetch(`/api/asset/${encodeURIComponent(ticker)}`);
+}
+
+async function fetchAI(message) {
+  return apiFetch('/api/chat', {
+    method : 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body   : JSON.stringify({ message }),
+  });
+}
+
+// ─── Render: Wallet ───────────────────────
+function renderWallet({ saldo_billetera, movimientos }) {
+  const balEl = document.getElementById('walletBalance');
+  balEl.textContent  = fmt(saldo_billetera);
+  balEl.className    = 'text-3xl font-bold mb-0.5 ' + (saldo_billetera >= 0 ? 'up' : 'down');
+
+  const listEl = document.getElementById('transactionsList');
+  if (!movimientos || movimientos.length === 0) {
+    listEl.innerHTML = '<div class="text-center text-gt-muted text-sm py-6">Sin movimientos aún</div>';
+    renderIncomeExpense([]);
+    return;
+  }
+
+  listEl.innerHTML = movimientos.slice(0, 12).map(t => `
+    <div class="flex items-center justify-between py-1.5 border-b border-gt-border">
+      <div class="flex items-center gap-2 min-w-0">
+        <span class="shrink-0 ${t.type === 'INGRESO' ? 'up' : 'down'} text-xs">
+          <i class="fas fa-arrow-${t.type === 'INGRESO' ? 'up' : 'down'}"></i>
+        </span>
+        <span class="text-xs text-gt-muted truncate max-w-36">${escHtml(t.description || 'Movimiento')}</span>
+      </div>
+      <div class="text-right shrink-0 ml-2">
+        <span class="text-sm font-bold ${t.type === 'INGRESO' ? 'up' : 'down'}">
+          ${t.type === 'INGRESO' ? '+' : '-'}${fmt(t.amount)}
+        </span>
+        <div class="text-xs text-gt-muted">${fmtDate(t.date)}</div>
+      </div>
+    </div>
+  `).join('');
+
+  renderIncomeExpense(movimientos);
+}
+
+// ─── Render: Investment lists ──────────────
+const PALETTE = ['#00ff88','#00aaff','#ffd700','#ff4466','#8844ff','#ff8800','#00ffcc','#ff66aa'];
+
+function invColor(inv, idx) {
+  return PALETTE[idx % PALETTE.length];
+}
+
+function renderInvestmentLists(investments) {
+  const passive = investments.filter(i => i.type === 'PASIVA');
+  const active  = investments.filter(i => i.type === 'ACTIVA');
+
+  document.getElementById('passiveList').innerHTML = renderInvGroup(passive, 0);
+  document.getElementById('activeList').innerHTML  = renderInvGroup(active, passive.length);
+}
+
+function renderInvGroup(list, startIdx) {
+  if (list.length === 0)
+    return '<div class="text-center text-gt-muted text-sm py-10">Sin inversiones aún</div>';
+
+  return list.map((inv, i) => {
+    const color = PALETTE[(startIdx + i) % PALETTE.length];
+    const diff  = inv.current_value - inv.invested_amount;
+    const pct   = inv.invested_amount > 0
+      ? ((diff / inv.invested_amount) * 100).toFixed(2) + '%'
+      : 'N/A';
+
+    return `
+      <div class="gt-card p-4 cursor-pointer hover:border-gray-500 transition-all
+                  ${inv.type === 'PASIVA' ? 'inv-passive' : 'inv-active'}"
+           onclick="toggleDetails(${inv.id})">
+        <div class="flex items-center justify-between gap-3">
+          <div class="flex items-center gap-3 min-w-0">
+            <div class="w-9 h-9 rounded-lg flex items-center justify-center text-xs font-bold shrink-0"
+                 style="background:${color}22;color:${color};border:1px solid ${color}44;">
+              ${escHtml(inv.asset_name.substring(0, 2).toUpperCase())}
+            </div>
+            <div class="min-w-0">
+              <div class="font-bold text-sm truncate">${escHtml(inv.asset_name)}</div>
+              <div class="text-xs text-gt-muted">${inv.type}</div>
+            </div>
+          </div>
+          <div class="flex items-center gap-3 shrink-0">
+            <div class="text-right">
+              <div class="font-bold text-sm">${fmt(inv.current_value)}</div>
+              <div class="text-xs ${diff >= 0 ? 'up' : 'down'}">
+                ${diff >= 0 ? '+' : ''}${fmt(diff)}
+              </div>
+            </div>
+            <button onclick="event.stopPropagation();confirmDelete(${inv.id},'${escAttr(inv.asset_name)}')"
+                    class="btn-danger p-2 rounded-lg text-xs shrink-0">
+              <i class="fas fa-trash"></i>
+            </button>
+          </div>
+        </div>
+        <!-- Expandable detail -->
+        <div id="inv-det-${inv.id}" style="display:none;" class="mt-3 pt-3 border-t border-gt-border">
+          <div class="grid grid-cols-2 gap-2 text-xs text-gt-muted">
+            <div>Invertido: <span class="text-white">${fmt(inv.invested_amount)}</span></div>
+            <div>Actual: <span class="text-white">${fmt(inv.current_value)}</span></div>
+            <div>Tipo: <span class="text-white">${inv.type}</span></div>
+            <div>Rentabilidad: <span class="${diff >= 0 ? 'up' : 'down'}">${pct}</span></div>
+          </div>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function toggleDetails(id) {
+  const el = document.getElementById(`inv-det-${id}`);
+  if (el) el.style.display = el.style.display === 'none' ? '' : 'none';
+}
+
+// ─── Charts ───────────────────────────────
+const CHART_OPT = {
+  responsive: true,
+  plugins: { legend: { labels: { color: '#6666aa', font: { size: 11 } } } },
+  scales: {
+    x: { grid: { color: '#1e1e2e' }, ticks: { color: '#6666aa', maxTicksLimit: 8 } },
+    y: { grid: { color: '#1e1e2e' }, ticks: { color: '#6666aa' } },
+  },
+};
+
+function destroyChart(key) {
+  if (S.charts[key]) { S.charts[key].destroy(); S.charts[key] = null; }
+}
+
+function renderCapitalChart() {
+  destroyChart('capital');
+  const ctx = document.getElementById('capitalChart').getContext('2d');
+
+  const movs = S.wallet.movimientos || [];
+  const invTotal = S.investments.reduce((s, i) => s + i.current_value, 0);
+  const labels = [];
+  const values = [];
+
+  if (movs.length > 0) {
+    const sorted = [...movs].sort((a, b) => new Date(a.date) - new Date(b.date));
+    let running = 0;
+    sorted.forEach(m => {
+      running += m.type === 'INGRESO' ? m.amount : -m.amount;
+      labels.push(fmtDate(m.date));
+      values.push(+(running + invTotal).toFixed(2));
+    });
+  } else {
+    labels.push('Hoy');
+    values.push(invTotal);
+  }
+
+  S.charts.capital = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [{
+        label     : 'Capital Total',
+        data      : values,
+        borderColor: '#00ff88',
+        backgroundColor: 'rgba(0,255,136,.06)',
+        fill      : true,
+        tension   : 0.4,
+        pointRadius: 3,
+        pointBackgroundColor: '#00ff88',
+      }],
+    },
+    options: { ...CHART_OPT, plugins: { legend: { display: false } } },
+  });
+}
+
+function renderIncomeExpense(movs) {
+  destroyChart('ie');
+  const ctx = document.getElementById('incomeExpenseChart').getContext('2d');
+
+  const ingresos = movs.filter(m => m.type === 'INGRESO').reduce((s, m) => s + m.amount, 0);
+  const gastos   = movs.filter(m => m.type === 'GASTO').reduce((s, m) => s + m.amount, 0);
+
+  S.charts.ie = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: ['Ingresos', 'Gastos'],
+      datasets: [{
+        data           : [ingresos, gastos],
+        backgroundColor: ['rgba(0,255,136,.6)', 'rgba(255,68,102,.6)'],
+        borderColor    : ['#00ff88', '#ff4466'],
+        borderWidth    : 1,
+        borderRadius   : 6,
+      }],
+    },
+    options: { ...CHART_OPT, plugins: { legend: { display: false } } },
+  });
+}
+
+function renderDistribution(investments) {
+  destroyChart('dist');
+  const ctx = document.getElementById('distributionChart').getContext('2d');
+  const legend = document.getElementById('distributionLegend');
+
+  if (investments.length === 0) {
+    legend.innerHTML = '<div class="text-gt-muted text-sm">Sin inversiones</div>';
+    return;
+  }
+
+  const labels = investments.map(i => i.asset_name);
+  const data   = investments.map(i => i.current_value);
+  const colors = investments.map((_, idx) => PALETTE[idx % PALETTE.length]);
+  const total  = data.reduce((s, v) => s + v, 0);
+
+  S.charts.dist = new Chart(ctx, {
+    type: 'doughnut',
+    data: { labels, datasets: [{ data, backgroundColor: colors, borderColor: colors.map(c => c + '99'), borderWidth: 2 }] },
+    options: { responsive: true, cutout: '65%', plugins: { legend: { display: false } } },
+  });
+
+  legend.innerHTML = investments.map((inv, idx) => `
+    <div class="flex items-center justify-between gap-2 min-w-0">
+      <div class="flex items-center gap-2 min-w-0">
+        <span class="w-2.5 h-2.5 rounded-full shrink-0" style="background:${colors[idx]};"></span>
+        <span class="text-xs text-gray-300 truncate">${escHtml(inv.asset_name)}</span>
+      </div>
+      <div class="text-right shrink-0">
+        <span class="text-xs font-bold text-white">${fmt(inv.current_value)}</span>
+        <span class="text-xs text-gt-muted ml-1">${total > 0 ? ((inv.current_value / total) * 100).toFixed(1) + '%' : '0%'}</span>
+      </div>
+    </div>
+  `).join('');
+}
+
+function renderComparative(investments) {
+  destroyChart('cmp');
+  const ctx = document.getElementById('comparativeChart').getContext('2d');
+  if (investments.length === 0) return;
+
+  S.charts.cmp = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: investments.map(i => i.asset_name),
+      datasets: [
+        {
+          label          : 'Monto Invertido',
+          data           : investments.map(i => i.invested_amount),
+          backgroundColor: 'rgba(90,90,130,.5)',
+          borderColor    : '#5a5a82',
+          borderWidth    : 1,
+          borderRadius   : 4,
+        },
+        {
+          label          : 'Valor Actual',
+          data           : investments.map(i => i.current_value),
+          backgroundColor: investments.map((_, idx) => PALETTE[idx % PALETTE.length] + 'aa'),
+          borderColor    : investments.map((_, idx) => PALETTE[idx % PALETTE.length]),
+          borderWidth    : 1,
+          borderRadius   : 4,
+        },
+      ],
+    },
+    options: CHART_OPT,
+  });
+}
+
+// ─── Wallet Modal ─────────────────────────
+function openWalletModal(type) {
+  S.walletType = type;
+  document.getElementById('walletModalTitle').textContent =
+    type === 'INGRESO' ? 'Registrar Ingreso' : 'Registrar Gasto';
+  const btn = document.getElementById('walletSubmitBtn');
+  btn.style.cssText = type === 'INGRESO'
+    ? 'background:linear-gradient(135deg,#00ff88,#00aaff);color:#0a0a0f;font-weight:700;flex:1;padding:8px;border-radius:8px;font-size:14px;cursor:pointer;'
+    : 'background:rgba(255,68,102,.8);color:#fff;font-weight:700;flex:1;padding:8px;border-radius:8px;font-size:14px;cursor:pointer;';
+  document.getElementById('walletAmount').value = '';
+  document.getElementById('walletDesc').value   = '';
+  document.getElementById('walletAmount').classList.remove('error');
+  const wErr = document.getElementById('walletAmountErr');
+  if (wErr) wErr.style.display = 'none';
+  showModal('walletModal');
+  setTimeout(() => document.getElementById('walletAmount').focus(), 80);
+}
+
+function closeWalletModal() { hideModal('walletModal'); }
+
+async function submitWallet() {
+  const amtEl  = document.getElementById('walletAmount');
+  const errEl  = document.getElementById('walletAmountErr');
+  const amt    = parseFloat(amtEl.value);
+  if (!amt || amt <= 0) {
+    amtEl.classList.add('error');
+    if (errEl) errEl.style.display = '';
+    return;
+  }
+  amtEl.classList.remove('error');
+  if (errEl) errEl.style.display = 'none';
+
+  const desc = document.getElementById('walletDesc').value.trim();
+  try {
+    await postWallet(S.walletType, amt, desc);
+    closeWalletModal();
+    await refreshAll();
+  } catch (e) { console.error('[submitWallet]', e); }
+}
+
+// ─── Investment Modal ─────────────────────
+function openInvModal(prefill) {
+  S.invType   = 'PASIVA';
+  S.invLiquid = true;
+  applyInvType('PASIVA');
+  document.getElementById('invName').value       = prefill || '';
+  document.getElementById('invAmount').value     = '';
+  document.getElementById('invCurrentVal').value = '';
+  document.getElementById('invMinBalance').value = '0';
+  document.getElementById('invColor').value      = '#00ff88';
+  document.getElementById('invName').classList.remove('error');
+  document.getElementById('invAmount').classList.remove('error');
+  const nErr = document.getElementById('invNameErr');
+  const aErr = document.getElementById('invAmountErr');
+  if (nErr) nErr.style.display = 'none';
+  if (aErr) aErr.style.display = 'none';
+  document.getElementById('liquidToggle').className = 'toggle-track on';
+  showModal('invModal');
+}
+
+function closeInvModal() { hideModal('invModal'); }
+
+function setInvType(type) {
+  S.invType = type;
+  applyInvType(type);
+}
+
+function applyInvType(type) {
+  const pBtn = document.getElementById('btnTypePasiva');
+  const aBtn = document.getElementById('btnTypeActiva');
+  const pOpts = document.getElementById('passiveOptions');
+
+  if (type === 'PASIVA') {
+    pBtn.className = 'flex-1 py-2 rounded-lg text-sm font-bold transition-all badge-blue';
+    aBtn.className = 'flex-1 py-2 rounded-lg text-sm font-bold transition-all btn-ghost';
+    pOpts.style.display = '';
+  } else {
+    aBtn.className = 'flex-1 py-2 rounded-lg text-sm font-bold transition-all badge-gold';
+    pBtn.className = 'flex-1 py-2 rounded-lg text-sm font-bold transition-all btn-ghost';
+    pOpts.style.display = 'none';
+  }
+}
+
+function toggleLiquid() {
+  S.invLiquid = !S.invLiquid;
+  const track = document.getElementById('liquidToggle');
+  track.className = 'toggle-track ' + (S.invLiquid ? 'on' : 'off');
+}
+
+async function submitInvestment() {
+  const nameEl   = document.getElementById('invName');
+  const amtEl    = document.getElementById('invAmount');
+  const nameErrEl = document.getElementById('invNameErr');
+  const amtErrEl  = document.getElementById('invAmountErr');
+  const name     = nameEl.value.trim();
+  const amt      = parseFloat(amtEl.value);
+  let valid      = true;
+
+  if (!name) {
+    nameEl.classList.add('error');
+    if (nameErrEl) nameErrEl.style.display = '';
+    valid = false;
+  } else {
+    nameEl.classList.remove('error');
+    if (nameErrEl) nameErrEl.style.display = 'none';
+  }
+  if (!amt || amt <= 0) {
+    amtEl.classList.add('error');
+    if (amtErrEl) amtErrEl.style.display = '';
+    valid = false;
+  } else {
+    amtEl.classList.remove('error');
+    if (amtErrEl) amtErrEl.style.display = 'none';
+  }
+  if (!valid) return;
+
+  const curVal = parseFloat(document.getElementById('invCurrentVal').value) || amt;
+
+  try {
+    await postInvestment({
+      type           : S.invType,
+      asset_name     : name,
+      invested_amount: amt,
+      current_value  : curVal,
+    });
+    closeInvModal();
+    await refreshAll();
+  } catch (e) { console.error('[submitInvestment]', e); }
+}
+
+async function confirmDelete(id, name) {
+  if (!confirm(`¿Eliminar "${escHtml(String(name))}" del portafolio?`)) return;
+  try {
+    await deleteInvestmentById(id);
+    await refreshAll();
+  } catch (e) { console.error('[deleteInvestment]', e); }
+}
+
+// ─── Market Explorer ──────────────────────
+const POPULAR = [
+  { t: 'SPY',     n: 'S&P 500 ETF',      i: '📊' },
+  { t: 'QQQ',     n: 'Nasdaq 100 ETF',   i: '💻' },
+  { t: 'VTI',     n: 'Total Market ETF', i: '🌎' },
+  { t: 'IWM',     n: 'Russell 2000',     i: '📈' },
+  { t: 'GLD',     n: 'Gold ETF',         i: '🥇' },
+  { t: 'BTC-USD', n: 'Bitcoin',          i: '₿'  },
+  { t: 'ETH-USD', n: 'Ethereum',         i: '⟠'  },
+  { t: 'AAPL',    n: 'Apple',            i: '🍎' },
+  { t: 'MSFT',    n: 'Microsoft',        i: '🪟' },
+  { t: 'NVDA',    n: 'NVIDIA',           i: '🎮' },
+  { t: 'AMZN',    n: 'Amazon',           i: '📦' },
+  { t: 'ARKK',    n: 'ARK Innovation',   i: '🚀' },
+];
+
+function renderPopular() {
+  document.getElementById('popularGrid').innerHTML = POPULAR.map(a => `
+    <button onclick="quickSearch('${a.t}')"
+            class="gt-card p-3 text-left hover:border-gray-500 transition-all group cursor-pointer">
+      <div class="text-xl mb-1">${a.i}</div>
+      <div class="font-bold text-sm group-hover:text-gt-green transition-colors">${a.t}</div>
+      <div class="text-xs text-gt-muted">${a.n}</div>
+    </button>
+  `).join('');
+}
+
+function quickSearch(ticker) {
+  document.getElementById('tickerSearch').value = ticker;
+  searchTicker();
+}
+
+async function searchTicker() {
+  const ticker = document.getElementById('tickerSearch').value.trim().toUpperCase();
+  if (!ticker) return;
+
+  const result = document.getElementById('assetResult');
+  result.style.display = '';
+  document.getElementById('assetName').textContent  = ticker;
+  document.getElementById('assetPrice').textContent = '…';
+  document.getElementById('assetSma').textContent   = '…';
+  document.getElementById('assetTrend').innerHTML   = '…';
+  S.currentAsset = null;
+
+  try {
+    const d = await fetchAsset(ticker);
+    S.currentAsset = d;
+    document.getElementById('assetName').textContent    = d.asset;
+    document.getElementById('assetPrice').textContent   = `$${d.real_price}`;
+    document.getElementById('assetSma').textContent     = `$${d.sma_20}`;
+    const bull = d.real_price > d.sma_20;
+    document.getElementById('assetTrend').innerHTML = bull
+      ? '<span class="up"><i class="fas fa-arrow-trend-up mr-1"></i>Alcista</span>'
+      : '<span class="down"><i class="fas fa-arrow-trend-down mr-1"></i>Bajista</span>';
+  } catch (e) {
+    document.getElementById('assetPrice').innerHTML = '<span class="down">No encontrado</span>';
+    document.getElementById('assetSma').textContent = '-';
+    document.getElementById('assetTrend').textContent = '-';
+  }
+}
+
+function addAssetToPortfolio() {
+  if (!S.currentAsset) return;
+  switchTab('inversiones');
+  openInvModal(S.currentAsset.asset);
+  setInvType('ACTIVA');
+  document.getElementById('invCurrentVal').value = S.currentAsset.real_price;
+}
+
+// ─── AI ───────────────────────────────────
+async function askAI() {
+  const summary = S.investments.map(i => `${i.asset_name}=${fmt(i.current_value)}`).join(', ');
+  const msg = `Mi portafolio: Billetera=${fmt(S.wallet.saldo_billetera)}, Inversiones=[${summary || 'ninguna'}], Capital Neto=${fmt(S.capitalNeto)}. Dame recomendaciones concretas y accionables.`;
+  await sendToAI(msg);
+}
+
+async function quickAI(question) {
+  const summary = S.investments.map(i => `${i.asset_name}=${fmt(i.current_value)}`).join(', ');
+  await sendToAI(`${question} — contexto: billetera=${fmt(S.wallet.saldo_billetera)}, inversiones=[${summary || 'ninguna'}]`);
+}
+
+async function sendToAI(message) {
+  const btn = document.getElementById('aiBtn');
+  const el  = document.getElementById('aiResponse');
+  btn.disabled   = true;
+  btn.innerHTML  = '<span class="spinner mr-1"></span>Analizando…';
+  el.innerHTML   = '<div class="text-gt-muted text-sm"><span class="spinner mr-2"></span>Giga.IA está pensando…</div>';
+
+  try {
+    const d = await fetchAI(message);
+    el.innerHTML = `<div class="text-sm leading-relaxed" style="color:#c0c0ff;">${escHtml(d.response).replace(/\n/g, '<br>')}</div>`;
+  } catch (e) {
+    el.innerHTML = '<div class="down text-sm">Error al conectar con Giga.IA. Verifica que el backend esté activo.</div>';
+  } finally {
+    btn.disabled  = false;
+    btn.innerHTML = '<i class="fas fa-wand-magic-sparkles mr-1"></i>Analizar';
+  }
+}
+
+// ─── Tab navigation ───────────────────────
+function switchTab(tab) {
+  ['estado', 'inversiones', 'mercado'].forEach(t => {
+    const btn = document.getElementById(`tab-btn-${t}`);
+    const sec = document.getElementById(`tab-${t}`);
+    const active = t === tab;
+    btn.classList.toggle('active', active);
+    sec.style.display = active ? '' : 'none';
+  });
+  if (tab === 'estado') renderCapitalChart();
+}
+
+// ─── Modal helpers ────────────────────────
+function showModal(id) { document.getElementById(id).style.display = 'flex'; }
+function hideModal(id) { document.getElementById(id).style.display = 'none'; }
+
+// ─── Security helpers ─────────────────────
+function escHtml(str) {
+  return String(str ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function escAttr(str) {
+  return String(str ?? '').replace(/'/g, "\\'").replace(/"/g, '&quot;');
+}
+
+// ─── Refresh all data ─────────────────────
+async function refreshAll() {
+  await Promise.all([loadCapitalNeto(), loadWallet(), loadInvestments()]);
+  renderCapitalChart();
+}
+
+// ─── Keyboard shortcuts ───────────────────
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') { closeWalletModal(); closeInvModal(); }
+});
+
+// ─── Init ─────────────────────────────────
+(async function init() {
+  renderPopular();
+  await refreshAll();
+})();
+</script>
+
+</body>
+</html>
