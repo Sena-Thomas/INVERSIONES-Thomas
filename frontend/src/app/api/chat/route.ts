@@ -80,7 +80,12 @@ ${investments.map((i) => `  * ${i.name} (${i.category}): Invertido $${i.initialA
 
     return NextResponse.json({ reply });
   } catch (error) {
-    console.error('[Chat API] Error al llamar al proveedor de IA:', error);
+    if (error instanceof OpenAI.APIError) {
+      console.error('[Chat API] xAI API Error - Status:', error.status, '- Message:', error.message);
+      console.error('[Chat API] xAI API Error Body:', JSON.stringify(error.error));
+    } else {
+      console.error('[Chat API] Error inesperado al llamar al proveedor de IA:', error);
+    }
     return NextResponse.json(
       { error: 'Error en el proveedor de IA. Por favor intenta de nuevo más tarde.' },
       { status: 500 }

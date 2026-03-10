@@ -366,7 +366,8 @@ export default function ThomasCorpApp() {
   const comparativeData = investments.map(inv => ({
     name: inv.name,
     rentabilidad: inv.currentAmount - inv.initialAmount,
-    fill: inv.color
+    fill: inv.category === 'ACTIVA' ? '#00f0ff' : '#ff0055',
+    category: inv.category,
   }));
 
   // ==========================================
@@ -693,15 +694,26 @@ export default function ThomasCorpApp() {
       {/* GRÁFICA COMPARATIVA GLOBAL */}
       {investments.length > 0 && (
         <div className="mt-10 bg-[#0A0A16]/80 p-6 rounded-2xl border border-white/10">
-          <h3 className="text-xs text-gray-400 uppercase tracking-widest mb-6">Comparativa de Rentabilidad (Ganancia/Pérdida)</h3>
+          <h3 className="text-xs text-gray-400 uppercase tracking-widest mb-2">Comparativa de Rentabilidad (Ganancia/Pérdida)</h3>
+          <div className="flex gap-4 mb-4">
+            <span className="flex items-center gap-1 text-[10px] text-gray-400"><span className="inline-block w-3 h-3 rounded-sm bg-[#ff0055]" /> Pasiva</span>
+            <span className="flex items-center gap-1 text-[10px] text-gray-400"><span className="inline-block w-3 h-3 rounded-sm bg-[#00f0ff]" /> Activa</span>
+          </div>
           <div className="h-[250px] w-full">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={comparativeData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#ffffff05" vertical={false} />
                 <XAxis dataKey="name" stroke="#ffffff30" fontSize={10} />
                 <YAxis stroke="#ffffff30" fontSize={10} tickFormatter={(val) => `$${val / 1000}k`} />
-                <RechartsTooltip contentStyle={{ backgroundColor: '#05050A', borderColor: '#333' }} cursor={{ fill: '#ffffff05' }} formatter={(val) => `$${(val as number)?.toLocaleString() ?? String(val)}`} />
-                <Bar dataKey="rentabilidad" radius={[4, 4, 0, 0]}>
+                <RechartsTooltip
+                  contentStyle={{ backgroundColor: '#05050A', borderColor: '#333' }}
+                  cursor={{ fill: '#ffffff05' }}
+                  formatter={(val, _name, props) => [
+                    typeof val === 'number' ? `$${val.toLocaleString()}` : String(val),
+                    props.payload?.category === 'ACTIVA' ? 'Activa' : 'Pasiva',
+                  ]}
+                />
+                <Bar dataKey="rentabilidad" radius={[4, 4, 0, 0]} minPointSize={4}>
                   {comparativeData.map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={entry.fill} />
                   ))}
