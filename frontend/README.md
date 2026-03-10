@@ -11,7 +11,7 @@ Copy `.env.example` to `.env` and fill in the values below. **Never commit `.env
 | `GOOGLE_CLIENT_SECRET` | Google OAuth Client Secret | Same page as above |
 | `NEXTAUTH_SECRET` | Random secret for NextAuth session encryption | Run `openssl rand -base64 32` in your terminal |
 | `NEXTAUTH_URL` | Public URL of the app (e.g. `http://localhost:3000`) | Your deployment URL |
-| `XAI_API_KEY` | xAI (Grok) API key for the chatbot | [xAI Console](https://console.x.ai/) |
+| `GEMINI_API_KEY` | Google Gemini API key for the chatbot | [Google AI Studio](https://aistudio.google.com/) → Get API Key |
 
 ### Google OAuth setup
 
@@ -24,11 +24,11 @@ Copy `.env.example` to `.env` and fill in the values below. **Never commit `.env
    - `https://<your-domain>/api/auth/callback/google` (production)
 6. Copy the **Client ID** → `GOOGLE_CLIENT_ID` and **Client Secret** → `GOOGLE_CLIENT_SECRET`.
 
-### Grok (xAI) setup
+### Google Gemini setup
 
-1. Go to <https://console.x.ai/> and sign in.
-2. Create an API key.
-3. Copy it → `XAI_API_KEY`.
+1. Go to <https://aistudio.google.com/> and sign in with your Google account.
+2. Click **"Get API Key"** → **"Create API key"**.
+3. Copy it → `GEMINI_API_KEY`.
 
 ## Getting Started
 

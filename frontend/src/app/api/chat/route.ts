@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-import OpenAI from 'openai';
+import { GoogleGenerativeAI, GoogleGenerativeAIError } from '@google/generative-ai';
 
 export async function POST(req: Request) {
   try {
@@ -51,39 +51,32 @@ ${investments.map((i) => `  * ${i.name} (${i.category}): Invertido $${i.initialA
 `;
 
     // 3. Llamar al proveedor de IA con el contexto financiero
-    if (!process.env.XAI_API_KEY) {
+    if (!process.env.GEMINI_API_KEY) {
       return NextResponse.json(
         {
-          reply: `Hola ${session.user.name ?? 'usuario'}! Soy tu asesor financiero IA. Actualmente no tengo acceso a un proveedor de IA configurado (falta XAI_API_KEY), pero puedo ver tu contexto financiero:\n\n${financialContext}\n\nConfigura tu XAI_API_KEY en .env para respuestas inteligentes.`,
+          reply: `Hola ${session.user.name ?? 'usuario'}! Soy tu asesor financiero IA. Actualmente no tengo acceso a un proveedor de IA configurado (falta GEMINI_API_KEY), pero puedo ver tu contexto financiero:\n\n${financialContext}\n\nConfigura tu GEMINI_API_KEY en .env para respuestas inteligentes.`,
         }
       );
     }
 
-    const grokClient = new OpenAI({
-      apiKey: process.env.XAI_API_KEY,
-      baseURL: 'https://api.x.ai/v1',
+    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+    const model = genAI.getGenerativeModel({
+      model: 'gemini-1.5-flash',
+      systemInstruction: `Eres un asesor financiero personal experto en inversiones, ahorro y optimización de gastos para el mercado latinoamericano (especialmente Colombia). Responde siempre en español, de forma concisa y con emojis financieros. Usa el contexto financiero real del usuario para dar consejos personalizados.\n\n${financialContext}`,
     });
 
-    const completion = await grokClient.chat.completions.create({
-      model: 'grok-4-latest',
-      messages: [
-        {
-          role: 'system',
-          content: `Eres un asesor financiero personal experto en inversiones, ahorro y optimización de gastos para el mercado latinoamericano (especialmente Colombia). Responde siempre en español, de forma concisa y con emojis financieros. Usa el contexto financiero real del usuario para dar consejos personalizados.\n\n${financialContext}`,
-        },
-        { role: 'user', content: message },
-      ],
-      max_tokens: 500,
+    const result = await model.generateContent({
+      contents: [{ role: 'user', parts: [{ text: message }] }],
+      generationConfig: { maxOutputTokens: 500 },
     });
 
-    const reply = completion.choices[0]?.message?.content ?? 'Sin respuesta del modelo.';
+    const reply = result.response?.text() ?? 'Sin respuesta del modelo.';
 
     return NextResponse.json({ reply });
   } catch (error) {
     console.error('Error en API Chat:', error);
-    // Expose xAI SDK error messages (safe, sanitized by the SDK); mask unknown internal errors.
     const message =
-      error instanceof OpenAI.APIError
+      error instanceof GoogleGenerativeAIError
         ? error.message
         : 'Error interno del servidor. Revisa los logs para más detalles.';
     return NextResponse.json({ error: message }, { status: 500 });
