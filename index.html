@@ -1,0 +1,746 @@
+<!DOCTYPE html>
+<html lang="es" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Giga-Terminal Financiera 💰</title>
+
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: { DEFAULT: '#6366f1', dark: '#4f46e5' }
+          }
+        }
+      }
+    }
+  </script>
+
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+
+  <!-- FontAwesome -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+
+  <style>
+    body { background-color: #0f172a; color: #e2e8f0; font-family: 'Segoe UI', system-ui, sans-serif; }
+    .card { background-color: #1e293b; border: 1px solid #334155; border-radius: 0.75rem; }
+    .btn-primary { background-color: #6366f1; color: #fff; padding: 0.5rem 1.25rem; border-radius: 0.5rem; font-weight: 600; transition: background 0.15s; cursor: pointer; }
+    .btn-primary:hover { background-color: #4f46e5; }
+    .btn-danger { background-color: #ef4444; color: #fff; padding: 0.4rem 0.9rem; border-radius: 0.5rem; font-weight: 600; cursor: pointer; transition: background 0.15s; }
+    .btn-danger:hover { background-color: #dc2626; }
+    .btn-green { background-color: #22c55e; color: #fff; padding: 0.5rem 1.25rem; border-radius: 0.5rem; font-weight: 600; cursor: pointer; transition: background 0.15s; }
+    .btn-green:hover { background-color: #16a34a; }
+    input, select, textarea {
+      background-color: #0f172a;
+      border: 1px solid #475569;
+      color: #e2e8f0;
+      border-radius: 0.5rem;
+      padding: 0.5rem 0.75rem;
+      width: 100%;
+      outline: none;
+    }
+    input:focus, select:focus, textarea:focus { border-color: #6366f1; }
+    .tab-btn { padding: 0.6rem 1.25rem; border-radius: 0.5rem; font-weight: 600; cursor: pointer; transition: all 0.15s; color: #94a3b8; }
+    .tab-btn.active { background-color: #6366f1; color: #fff; }
+    .tab-btn:not(.active):hover { background-color: #1e293b; color: #e2e8f0; }
+    .modal-bg { position: fixed; inset: 0; background: rgba(0,0,0,0.7); display: flex; align-items: center; justify-content: center; z-index: 50; }
+    .tag-pasiva { background-color: #0ea5e9; color: #fff; padding: 0.2rem 0.6rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 700; }
+    .tag-activa { background-color: #f97316; color: #fff; padding: 0.2rem 0.6rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 700; }
+    .tag-ingreso { background-color: #22c55e; color: #fff; padding: 0.2rem 0.6rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 700; }
+    .tag-gasto { background-color: #ef4444; color: #fff; padding: 0.2rem 0.6rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 700; }
+    #chat-messages { max-height: 320px; overflow-y: auto; }
+    .spinner { border: 3px solid #334155; border-top-color: #6366f1; border-radius: 50%; width: 1.5rem; height: 1.5rem; animation: spin 0.7s linear infinite; display: inline-block; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    ::-webkit-scrollbar { width: 6px; } 
+    ::-webkit-scrollbar-track { background: #1e293b; }
+    ::-webkit-scrollbar-thumb { background: #475569; border-radius: 3px; }
+  </style>
+</head>
+<body class="min-h-screen p-4 md:p-6">
+
+  <!-- ===== HEADER ===== -->
+  <header class="flex items-center justify-between mb-6">
+    <div class="flex items-center gap-3">
+      <span class="text-3xl">💰</span>
+      <div>
+        <h1 class="text-2xl font-extrabold text-white">Giga-Terminal</h1>
+        <p class="text-xs text-slate-400">Control Financiero Total</p>
+      </div>
+    </div>
+    <div id="capital-badge" class="card px-4 py-2 text-center">
+      <p class="text-xs text-slate-400">Capital Neto</p>
+      <p id="capital-neto-val" class="text-xl font-bold text-green-400">$0.00</p>
+    </div>
+  </header>
+
+  <!-- ===== TABS ===== -->
+  <nav class="flex gap-2 mb-6 flex-wrap">
+    <button class="tab-btn active" onclick="showTab('estado')" id="tab-estado">
+      <i class="fa-solid fa-chart-pie mr-1"></i> Mi Estado
+    </button>
+    <button class="tab-btn" onclick="showTab('inversiones')" id="tab-inversiones">
+      <i class="fa-solid fa-briefcase mr-1"></i> Inversiones
+    </button>
+    <button class="tab-btn" onclick="showTab('search')" id="tab-search">
+      <i class="fa-solid fa-magnifying-glass-chart mr-1"></i> Búsqueda
+    </button>
+    <button class="tab-btn" onclick="showTab('ai')" id="tab-ai">
+      <i class="fa-solid fa-robot mr-1"></i> Giga.IA
+    </button>
+  </nav>
+
+  <!-- ============================= -->
+  <!-- TAB: MI ESTADO                -->
+  <!-- ============================= -->
+  <section id="tab-estado-content">
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+      <!-- Capital Neto Card -->
+      <div class="card p-5">
+        <div class="flex items-center justify-between mb-2">
+          <h3 class="text-slate-400 font-semibold text-sm">Capital Neto Total</h3>
+          <i class="fa-solid fa-vault text-indigo-400 text-lg"></i>
+        </div>
+        <p id="estado-capital" class="text-3xl font-extrabold text-green-400">$0.00</p>
+        <p class="text-xs text-slate-500 mt-1">Billetera + Inversiones</p>
+      </div>
+      <!-- Billetera -->
+      <div class="card p-5">
+        <div class="flex items-center justify-between mb-2">
+          <h3 class="text-slate-400 font-semibold text-sm">Saldo Billetera</h3>
+          <i class="fa-solid fa-wallet text-yellow-400 text-lg"></i>
+        </div>
+        <p id="estado-billetera" class="text-3xl font-extrabold text-yellow-400">$0.00</p>
+        <p class="text-xs text-slate-500 mt-1">Disponible para gastar</p>
+      </div>
+      <!-- Inversiones -->
+      <div class="card p-5">
+        <div class="flex items-center justify-between mb-2">
+          <h3 class="text-slate-400 font-semibold text-sm">Total Inversiones</h3>
+          <i class="fa-solid fa-chart-line text-blue-400 text-lg"></i>
+        </div>
+        <p id="estado-inversiones" class="text-3xl font-extrabold text-blue-400">$0.00</p>
+        <p class="text-xs text-slate-500 mt-1">Valor actual del portafolio</p>
+      </div>
+    </div>
+
+    <!-- Charts Row -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+      <div class="card p-5">
+        <h3 class="font-bold text-slate-300 mb-4"><i class="fa-solid fa-chart-donut mr-2 text-indigo-400"></i>Distribución del Portafolio</h3>
+        <canvas id="chartPortafolio" height="200"></canvas>
+      </div>
+      <div class="card p-5">
+        <h3 class="font-bold text-slate-300 mb-4"><i class="fa-solid fa-chart-bar mr-2 text-yellow-400"></i>Capital vs Invertido</h3>
+        <canvas id="chartCapital" height="200"></canvas>
+      </div>
+    </div>
+
+    <!-- Billetera / Gastos Hormiga -->
+    <div class="card p-5">
+      <div class="flex items-center justify-between mb-4 flex-wrap gap-2">
+        <h3 class="font-bold text-slate-300"><i class="fa-solid fa-money-bill-wave mr-2 text-green-400"></i>Billetera & Gastos Hormiga</h3>
+        <button class="btn-primary text-sm" onclick="openWalletModal()">
+          <i class="fa-solid fa-plus mr-1"></i> Nuevo Movimiento
+        </button>
+      </div>
+      <div id="wallet-list" class="space-y-2">
+        <p class="text-slate-500 text-sm">Cargando movimientos…</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================= -->
+  <!-- TAB: INVERSIONES              -->
+  <!-- ============================= -->
+  <section id="tab-inversiones-content" class="hidden">
+    <div class="flex items-center justify-between mb-4 flex-wrap gap-2">
+      <h2 class="text-xl font-bold text-white"><i class="fa-solid fa-briefcase mr-2 text-indigo-400"></i>Mis Inversiones</h2>
+      <button class="btn-primary" onclick="openInvModal()">
+        <i class="fa-solid fa-plus mr-1"></i> Agregar Inversión
+      </button>
+    </div>
+
+    <!-- Filter buttons -->
+    <div class="flex gap-2 mb-4 flex-wrap">
+      <button class="tab-btn active" id="filter-all" onclick="filterInvestments('all')">Todas</button>
+      <button class="tab-btn" id="filter-pasiva" onclick="filterInvestments('PASIVA')">Pasivas</button>
+      <button class="tab-btn" id="filter-activa" onclick="filterInvestments('ACTIVA')">Activas</button>
+    </div>
+
+    <div id="inv-list" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      <p class="text-slate-500 text-sm">Cargando inversiones…</p>
+    </div>
+  </section>
+
+  <!-- ============================= -->
+  <!-- TAB: BÚSQUEDA                 -->
+  <!-- ============================= -->
+  <section id="tab-search-content" class="hidden">
+    <div class="card p-5 mb-4">
+      <h2 class="text-xl font-bold text-white mb-4"><i class="fa-solid fa-magnifying-glass-chart mr-2 text-blue-400"></i>Búsqueda de Activos (ETF / Acciones)</h2>
+      <div class="flex gap-2">
+        <input id="search-ticker" type="text" placeholder="Ej: AAPL, SPY, QQQ, BTC-USD…" class="flex-1" />
+        <button class="btn-primary" onclick="searchAsset()">
+          <i class="fa-solid fa-search mr-1"></i> Buscar
+        </button>
+      </div>
+      <div class="flex flex-wrap gap-2 mt-3">
+        <span class="text-xs text-slate-500">Populares:</span>
+        <button onclick="quickSearch('SPY')" class="text-xs px-2 py-1 bg-slate-700 rounded hover:bg-slate-600">SPY</button>
+        <button onclick="quickSearch('QQQ')" class="text-xs px-2 py-1 bg-slate-700 rounded hover:bg-slate-600">QQQ</button>
+        <button onclick="quickSearch('AAPL')" class="text-xs px-2 py-1 bg-slate-700 rounded hover:bg-slate-600">AAPL</button>
+        <button onclick="quickSearch('NVDA')" class="text-xs px-2 py-1 bg-slate-700 rounded hover:bg-slate-600">NVDA</button>
+        <button onclick="quickSearch('BTC-USD')" class="text-xs px-2 py-1 bg-slate-700 rounded hover:bg-slate-600">BTC</button>
+        <button onclick="quickSearch('VTI')" class="text-xs px-2 py-1 bg-slate-700 rounded hover:bg-slate-600">VTI</button>
+        <button onclick="quickSearch('TSLA')" class="text-xs px-2 py-1 bg-slate-700 rounded hover:bg-slate-600">TSLA</button>
+      </div>
+    </div>
+
+    <div id="search-result" class="hidden card p-5">
+      <div class="flex items-center justify-between mb-4 flex-wrap gap-2">
+        <div>
+          <h3 id="search-ticker-name" class="text-2xl font-extrabold text-white"></h3>
+          <p class="text-slate-400 text-sm">Datos en tiempo real desde Yahoo Finance</p>
+        </div>
+        <button class="btn-primary text-sm" id="btn-add-from-search">
+          <i class="fa-solid fa-plus mr-1"></i> Agregar a Portafolio
+        </button>
+      </div>
+      <div class="grid grid-cols-2 gap-4">
+        <div class="card p-4">
+          <p class="text-slate-400 text-xs mb-1">Precio Actual</p>
+          <p id="search-price" class="text-2xl font-bold text-green-400"></p>
+        </div>
+        <div class="card p-4">
+          <p class="text-slate-400 text-xs mb-1">SMA 20 días</p>
+          <p id="search-sma" class="text-2xl font-bold text-blue-400"></p>
+        </div>
+      </div>
+      <div id="search-signal" class="mt-4 p-3 rounded-lg text-center font-bold"></div>
+    </div>
+
+    <div id="search-loading" class="hidden text-center py-10">
+      <div class="spinner mx-auto mb-2"></div>
+      <p class="text-slate-400">Buscando datos de mercado…</p>
+    </div>
+    <div id="search-error" class="hidden card p-5 text-center">
+      <i class="fa-solid fa-circle-exclamation text-red-400 text-3xl mb-2"></i>
+      <p id="search-error-msg" class="text-red-400"></p>
+    </div>
+  </section>
+
+  <!-- ============================= -->
+  <!-- TAB: GIGA.IA                  -->
+  <!-- ============================= -->
+  <section id="tab-ai-content" class="hidden">
+    <div class="card p-5">
+      <h2 class="text-xl font-bold text-white mb-4"><i class="fa-solid fa-robot mr-2 text-indigo-400"></i>Giga.IA — Tu Asesor Financiero</h2>
+      <div id="chat-messages" class="space-y-3 mb-4 p-3 bg-slate-900 rounded-lg min-h-[200px]">
+        <div class="flex gap-2">
+          <span class="text-indigo-400 font-bold shrink-0">🤖</span>
+          <p class="text-slate-300 text-sm">¡Hola! Soy Giga.IA, tu experto financiero con actitud. Pregúntame lo que quieras sobre inversiones, ETFs, criptomonedas o estrategias financieras.</p>
+        </div>
+      </div>
+      <div class="flex gap-2">
+        <input id="chat-input" type="text" placeholder="¿Qué ETF me recomiendas para largo plazo?" class="flex-1"
+          onkeydown="if(event.key==='Enter') sendChat()" />
+        <button class="btn-primary" onclick="sendChat()">
+          <i class="fa-solid fa-paper-plane"></i>
+        </button>
+      </div>
+      <div class="flex flex-wrap gap-2 mt-3">
+        <span class="text-xs text-slate-500">Preguntas rápidas:</span>
+        <button onclick="quickChat('¿Cuál es la diferencia entre inversión pasiva y activa?')" class="text-xs px-2 py-1 bg-slate-700 rounded hover:bg-slate-600">Pasiva vs Activa</button>
+        <button onclick="quickChat('¿Cuáles son los mejores ETFs para 2025?')" class="text-xs px-2 py-1 bg-slate-700 rounded hover:bg-slate-600">Mejores ETFs</button>
+        <button onclick="quickChat('¿Cómo reducir gastos hormiga?')" class="text-xs px-2 py-1 bg-slate-700 rounded hover:bg-slate-600">Gastos Hormiga</button>
+        <button onclick="quickChat('Explícame el S&P 500')" class="text-xs px-2 py-1 bg-slate-700 rounded hover:bg-slate-600">S&amp;P 500</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================= -->
+  <!-- MODAL: NUEVO MOVIMIENTO       -->
+  <!-- ============================= -->
+  <div id="wallet-modal" class="modal-bg hidden">
+    <div class="card p-6 w-full max-w-md mx-4">
+      <div class="flex items-center justify-between mb-4">
+        <h3 class="text-lg font-bold text-white">Nuevo Movimiento</h3>
+        <button onclick="closeModal('wallet-modal')" class="text-slate-400 hover:text-white text-xl">&times;</button>
+      </div>
+      <div class="space-y-3">
+        <div>
+          <label class="text-sm text-slate-400 block mb-1">Tipo</label>
+          <select id="wallet-type">
+            <option value="INGRESO">💚 Ingreso</option>
+            <option value="GASTO">🔴 Gasto Hormiga</option>
+          </select>
+        </div>
+        <div>
+          <label class="text-sm text-slate-400 block mb-1">Descripción</label>
+          <input id="wallet-desc" type="text" placeholder="Ej: Sueldo, Café, Netflix…" />
+        </div>
+        <div>
+          <label class="text-sm text-slate-400 block mb-1">Monto ($)</label>
+          <input id="wallet-amount" type="number" min="0" step="0.01" placeholder="0.00" />
+        </div>
+      </div>
+      <div class="flex gap-2 mt-5">
+        <button class="btn-green flex-1" onclick="submitWallet()">
+          <i class="fa-solid fa-check mr-1"></i> Guardar
+        </button>
+        <button class="flex-1 py-2 rounded-lg bg-slate-700 text-slate-300 hover:bg-slate-600 font-semibold" onclick="closeModal('wallet-modal')">Cancelar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================= -->
+  <!-- MODAL: NUEVA INVERSIÓN        -->
+  <!-- ============================= -->
+  <div id="inv-modal" class="modal-bg hidden">
+    <div class="card p-6 w-full max-w-md mx-4">
+      <div class="flex items-center justify-between mb-4">
+        <h3 class="text-lg font-bold text-white">Nueva Inversión</h3>
+        <button onclick="closeModal('inv-modal')" class="text-slate-400 hover:text-white text-xl">&times;</button>
+      </div>
+      <div class="space-y-3">
+        <div>
+          <label class="text-sm text-slate-400 block mb-1">Tipo</label>
+          <select id="inv-type">
+            <option value="PASIVA">📈 Pasiva (ETF, Índices…)</option>
+            <option value="ACTIVA">⚡ Activa (Acciones, Crypto…)</option>
+          </select>
+        </div>
+        <div>
+          <label class="text-sm text-slate-400 block mb-1">Nombre / Ticker</label>
+          <input id="inv-name" type="text" placeholder="Ej: SPY, AAPL, BTC…" />
+        </div>
+        <div>
+          <label class="text-sm text-slate-400 block mb-1">Monto Invertido ($)</label>
+          <input id="inv-invested" type="number" min="0" step="0.01" placeholder="0.00" />
+        </div>
+        <div>
+          <label class="text-sm text-slate-400 block mb-1">Valor Actual ($)</label>
+          <input id="inv-current" type="number" min="0" step="0.01" placeholder="0.00" />
+        </div>
+        <div>
+          <label class="text-sm text-slate-400 block mb-1">Color del Card</label>
+          <input id="inv-color" type="color" value="#6366f1" class="h-10 cursor-pointer" style="padding:0.2rem;width:100%;" />
+        </div>
+      </div>
+      <div class="flex gap-2 mt-5">
+        <button class="btn-primary flex-1" onclick="submitInvestment()">
+          <i class="fa-solid fa-check mr-1"></i> Guardar
+        </button>
+        <button class="flex-1 py-2 rounded-lg bg-slate-700 text-slate-300 hover:bg-slate-600 font-semibold" onclick="closeModal('inv-modal')">Cancelar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================= -->
+  <!-- MAIN SCRIPT                   -->
+  <!-- ============================= -->
+  <script>
+    // ─── STATE ──────────────────────────────────────────────────────
+    const state = {
+      investments: [],
+      wallet: { saldo: 0, movimientos: [] },
+      capital: { neto: 0, billetera: 0, inversiones: 0 },
+      invFilter: 'all',
+    };
+
+    // ─── CHARTS ─────────────────────────────────────────────────────
+    let chartPortafolio = null;
+    let chartCapital = null;
+
+    function initCharts() {
+      const ctx1 = document.getElementById('chartPortafolio').getContext('2d');
+      chartPortafolio = new Chart(ctx1, {
+        type: 'doughnut',
+        data: { labels: [], datasets: [{ data: [], backgroundColor: [], borderWidth: 2, borderColor: '#0f172a' }] },
+        options: {
+          plugins: { legend: { labels: { color: '#94a3b8', font: { size: 11 } } } },
+          cutout: '65%',
+          responsive: true,
+          maintainAspectRatio: true,
+        }
+      });
+
+      const ctx2 = document.getElementById('chartCapital').getContext('2d');
+      chartCapital = new Chart(ctx2, {
+        type: 'bar',
+        data: {
+          labels: ['Billetera', 'Inversiones', 'Capital Neto'],
+          datasets: [{
+            label: 'USD',
+            data: [0, 0, 0],
+            backgroundColor: ['#facc15', '#3b82f6', '#22c55e'],
+            borderRadius: 6,
+          }]
+        },
+        options: {
+          plugins: { legend: { display: false } },
+          scales: {
+            x: { ticks: { color: '#94a3b8' }, grid: { color: '#1e293b' } },
+            y: { ticks: { color: '#94a3b8' }, grid: { color: '#334155' } }
+          },
+          responsive: true,
+          maintainAspectRatio: true,
+        }
+      });
+    }
+
+    function updateCharts() {
+      const invs = state.investments;
+      if (chartPortafolio) {
+        chartPortafolio.data.labels = invs.length ? invs.map(i => i.asset_name) : ['Sin datos'];
+        chartPortafolio.data.datasets[0].data = invs.length ? invs.map(i => i.current_value) : [1];
+        chartPortafolio.data.datasets[0].backgroundColor = invs.length
+          ? invs.map((_, idx) => `hsl(${(idx * 60 + 220) % 360}, 70%, 55%)`)
+          : ['#334155'];
+        chartPortafolio.update();
+      }
+      if (chartCapital) {
+        chartCapital.data.datasets[0].data = [
+          state.capital.billetera,
+          state.capital.inversiones,
+          state.capital.neto
+        ];
+        chartCapital.update();
+      }
+    }
+
+    // ─── HELPERS ─────────────────────────────────────────────────────
+    const fmt = (n) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(n || 0);
+    const fmtDate = (d) => d ? new Date(d).toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' }) : '';
+
+    function setText(id, val) {
+      const el = document.getElementById(id);
+      if (el) el.textContent = val;
+    }
+
+    // ─── TAB SWITCHING ───────────────────────────────────────────────
+    const tabNames = ['estado', 'inversiones', 'search', 'ai'];
+    function showTab(name) {
+      tabNames.forEach(t => {
+        document.getElementById(`tab-${t}-content`).classList.toggle('hidden', t !== name);
+        document.getElementById(`tab-${t}`).classList.toggle('active', t === name);
+      });
+      if (name === 'estado') refreshAll();
+      if (name === 'inversiones') loadInvestments();
+    }
+
+    // ─── MODALS ──────────────────────────────────────────────────────
+    function openWalletModal() { document.getElementById('wallet-modal').classList.remove('hidden'); }
+    function openInvModal() { document.getElementById('inv-modal').classList.remove('hidden'); }
+    function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
+    // Close on backdrop click
+    document.querySelectorAll('.modal-bg').forEach(m => {
+      m.addEventListener('click', e => { if (e.target === m) m.classList.add('hidden'); });
+    });
+
+    // ─── API CALLS ───────────────────────────────────────────────────
+    async function apiFetch(path, opts = {}) {
+      const r = await fetch(path, { headers: { 'Content-Type': 'application/json' }, ...opts });
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      return r.json();
+    }
+
+    // ─── CAPITAL NETO ────────────────────────────────────────────────
+    async function loadCapitalNeto() {
+      try {
+        const data = await apiFetch('/api/capital-neto');
+        state.capital.neto = data.capital_neto_total || 0;
+        state.capital.billetera = data.desglose?.billetera || 0;
+        state.capital.inversiones = data.desglose?.inversiones || 0;
+        setText('capital-neto-val', fmt(state.capital.neto));
+        setText('estado-capital', fmt(state.capital.neto));
+        setText('estado-billetera', fmt(state.capital.billetera));
+        setText('estado-inversiones', fmt(state.capital.inversiones));
+        updateCharts();
+      } catch (e) {
+        // Backend not connected — show demo values
+        state.capital = { neto: 12450.75, billetera: 2450.75, inversiones: 10000 };
+        setText('capital-neto-val', fmt(state.capital.neto));
+        setText('estado-capital', fmt(state.capital.neto));
+        setText('estado-billetera', fmt(state.capital.billetera));
+        setText('estado-inversiones', fmt(state.capital.inversiones));
+        updateCharts();
+      }
+    }
+
+    // ─── WALLET ──────────────────────────────────────────────────────
+    async function loadWallet() {
+      const el = document.getElementById('wallet-list');
+      try {
+        const data = await apiFetch('/api/wallet');
+        state.wallet = { saldo: data.saldo_billetera || 0, movimientos: data.movimientos || [] };
+        renderWallet();
+      } catch (e) {
+        // Demo data
+        state.wallet = {
+          saldo: 2450.75,
+          movimientos: [
+            { id: 1, type: 'INGRESO', description: 'Sueldo', amount: 3000, date: new Date().toISOString() },
+            { id: 2, type: 'GASTO', description: 'Café diario', amount: 5.50, date: new Date().toISOString() },
+            { id: 3, type: 'GASTO', description: 'Netflix', amount: 15.99, date: new Date().toISOString() },
+            { id: 4, type: 'GASTO', description: 'Almuerzo', amount: 12.50, date: new Date().toISOString() },
+          ]
+        };
+        renderWallet();
+      }
+    }
+
+    function renderWallet() {
+      const el = document.getElementById('wallet-list');
+      const movs = state.wallet.movimientos;
+      if (!movs || movs.length === 0) {
+        el.innerHTML = '<p class="text-slate-500 text-sm">Sin movimientos registrados.</p>';
+        return;
+      }
+      el.innerHTML = movs.map(m => `
+        <div class="flex items-center justify-between p-3 bg-slate-900 rounded-lg">
+          <div class="flex items-center gap-3">
+            <span class="${m.type === 'INGRESO' ? 'text-green-400' : 'text-red-400'} text-xl">
+              ${m.type === 'INGRESO' ? '↑' : '↓'}
+            </span>
+            <div>
+              <p class="font-semibold text-white text-sm">${m.description || 'Movimiento'}</p>
+              <p class="text-xs text-slate-500">${fmtDate(m.date)}</p>
+            </div>
+          </div>
+          <div class="text-right">
+            <p class="font-bold ${m.type === 'INGRESO' ? 'text-green-400' : 'text-red-400'}">
+              ${m.type === 'INGRESO' ? '+' : '-'}${fmt(m.amount)}
+            </p>
+            <span class="tag-${m.type.toLowerCase()}">${m.type}</span>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    async function submitWallet() {
+      const type = document.getElementById('wallet-type').value;
+      const description = document.getElementById('wallet-desc').value || 'Movimiento';
+      const amount = parseFloat(document.getElementById('wallet-amount').value);
+      if (!amount || amount <= 0) { alert('Ingresa un monto válido.'); return; }
+      try {
+        await apiFetch('/api/wallet', {
+          method: 'POST',
+          body: JSON.stringify({ type, description, amount })
+        });
+      } catch (e) {
+        // In demo mode just add to state locally
+        state.wallet.movimientos.unshift({ id: Date.now(), type, description, amount, date: new Date().toISOString() });
+        if (type === 'INGRESO') state.wallet.saldo += amount;
+        else state.wallet.saldo -= amount;
+      }
+      closeModal('wallet-modal');
+      document.getElementById('wallet-desc').value = '';
+      document.getElementById('wallet-amount').value = '';
+      await loadWallet();
+      await loadCapitalNeto();
+    }
+
+    // ─── INVESTMENTS ─────────────────────────────────────────────────
+    async function loadInvestments() {
+      const el = document.getElementById('inv-list');
+      try {
+        const data = await apiFetch('/api/investments');
+        state.investments = data || [];
+        renderInvestments();
+      } catch (e) {
+        // Demo data
+        state.investments = [
+          { id: 1, type: 'PASIVA', asset_name: 'SPY', invested_amount: 5000, current_value: 5800 },
+          { id: 2, type: 'PASIVA', asset_name: 'VTI', invested_amount: 3000, current_value: 3200 },
+          { id: 3, type: 'ACTIVA', asset_name: 'NVDA', invested_amount: 2000, current_value: 2450 },
+          { id: 4, type: 'ACTIVA', asset_name: 'BTC-USD', invested_amount: 1500, current_value: 1750 },
+        ];
+        renderInvestments();
+      }
+    }
+
+    function filterInvestments(filter) {
+      state.invFilter = filter;
+      ['all', 'pasiva', 'activa'].forEach(f => {
+        document.getElementById(`filter-${f}`).classList.toggle('active', f.toUpperCase() === filter.toUpperCase() || f === filter);
+      });
+      renderInvestments();
+    }
+
+    function renderInvestments() {
+      const el = document.getElementById('inv-list');
+      let invs = state.investments;
+      if (state.invFilter !== 'all') invs = invs.filter(i => i.type === state.invFilter);
+      if (invs.length === 0) {
+        el.innerHTML = '<p class="text-slate-500 text-sm col-span-3">No hay inversiones en esta categoría.</p>';
+        return;
+      }
+      el.innerHTML = invs.map(inv => {
+        const profit = inv.current_value - inv.invested_amount;
+        const pct = inv.invested_amount ? ((profit / inv.invested_amount) * 100).toFixed(2) : '0.00';
+        const isPos = profit >= 0;
+        return `
+          <div class="card p-5 relative overflow-hidden">
+            <div class="absolute top-0 left-0 w-1 h-full ${inv.type === 'PASIVA' ? 'bg-sky-500' : 'bg-orange-500'}"></div>
+            <div class="flex items-start justify-between mb-3 pl-3">
+              <div>
+                <span class="tag-${inv.type.toLowerCase()} mr-2">${inv.type}</span>
+                <h4 class="text-lg font-extrabold text-white mt-1">${inv.asset_name}</h4>
+              </div>
+              <button onclick="deleteInvestment(${inv.id})" class="text-slate-600 hover:text-red-400 transition-colors text-lg ml-2">
+                <i class="fa-solid fa-trash"></i>
+              </button>
+            </div>
+            <div class="pl-3 space-y-1">
+              <div class="flex justify-between text-sm">
+                <span class="text-slate-400">Invertido</span>
+                <span class="font-semibold text-white">${fmt(inv.invested_amount)}</span>
+              </div>
+              <div class="flex justify-between text-sm">
+                <span class="text-slate-400">Valor Actual</span>
+                <span class="font-semibold text-white">${fmt(inv.current_value)}</span>
+              </div>
+              <div class="flex justify-between text-sm border-t border-slate-700 pt-1 mt-1">
+                <span class="text-slate-400">P&amp;L</span>
+                <span class="font-bold ${isPos ? 'text-green-400' : 'text-red-400'}">
+                  ${isPos ? '+' : ''}${fmt(profit)} (${pct}%)
+                </span>
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    async function deleteInvestment(id) {
+      if (!confirm('¿Eliminar esta inversión?')) return;
+      try {
+        await apiFetch(`/api/investments/${id}`, { method: 'DELETE' });
+      } catch (e) {
+        state.investments = state.investments.filter(i => i.id !== id);
+      }
+      await loadInvestments();
+      await loadCapitalNeto();
+      updateCharts();
+    }
+
+    async function submitInvestment() {
+      const type = document.getElementById('inv-type').value;
+      const asset_name = document.getElementById('inv-name').value.trim().toUpperCase();
+      const invested_amount = parseFloat(document.getElementById('inv-invested').value);
+      const current_value = parseFloat(document.getElementById('inv-current').value);
+      if (!asset_name || !invested_amount || !current_value) { alert('Completa todos los campos.'); return; }
+      try {
+        await apiFetch('/api/investments', {
+          method: 'POST',
+          body: JSON.stringify({ type, asset_name, invested_amount, current_value })
+        });
+      } catch (e) {
+        state.investments.push({ id: Date.now(), type, asset_name, invested_amount, current_value });
+      }
+      closeModal('inv-modal');
+      document.getElementById('inv-name').value = '';
+      document.getElementById('inv-invested').value = '';
+      document.getElementById('inv-current').value = '';
+      await loadInvestments();
+      await loadCapitalNeto();
+      updateCharts();
+    }
+
+    // ─── ASSET SEARCH ────────────────────────────────────────────────
+    let lastSearchTicker = '';
+
+    function quickSearch(ticker) {
+      document.getElementById('search-ticker').value = ticker;
+      searchAsset();
+    }
+
+    async function searchAsset() {
+      const ticker = document.getElementById('search-ticker').value.trim().toUpperCase();
+      if (!ticker) return;
+      lastSearchTicker = ticker;
+      document.getElementById('search-result').classList.add('hidden');
+      document.getElementById('search-error').classList.add('hidden');
+      document.getElementById('search-loading').classList.remove('hidden');
+      try {
+        const data = await apiFetch(`/api/asset/${ticker}`);
+        document.getElementById('search-loading').classList.add('hidden');
+        document.getElementById('search-result').classList.remove('hidden');
+        document.getElementById('search-ticker-name').textContent = data.asset;
+        document.getElementById('search-price').textContent = fmt(data.real_price);
+        document.getElementById('search-sma').textContent = fmt(data.sma_20);
+        const sig = document.getElementById('search-signal');
+        if (data.real_price > data.sma_20) {
+          sig.textContent = '🚀 SEÑAL ALCISTA — El precio está por encima de la SMA20. Tendencia positiva.';
+          sig.className = 'mt-4 p-3 rounded-lg text-center font-bold bg-green-900/40 text-green-400';
+        } else {
+          sig.textContent = '⚠️ SEÑAL BAJISTA — El precio está por debajo de la SMA20. Precaución.';
+          sig.className = 'mt-4 p-3 rounded-lg text-center font-bold bg-red-900/40 text-red-400';
+        }
+        document.getElementById('btn-add-from-search').onclick = () => {
+          document.getElementById('inv-name').value = data.asset;
+          document.getElementById('inv-current').value = data.real_price;
+          showTab('inversiones');
+          openInvModal();
+        };
+      } catch (e) {
+        document.getElementById('search-loading').classList.add('hidden');
+        document.getElementById('search-error').classList.remove('hidden');
+        document.getElementById('search-error-msg').textContent =
+          `No se encontraron datos para "${ticker}". Verifica el ticker o la conexión con el backend.`;
+      }
+    }
+
+    // ─── AI CHAT ─────────────────────────────────────────────────────
+    function quickChat(msg) {
+      document.getElementById('chat-input').value = msg;
+      sendChat();
+    }
+
+    async function sendChat() {
+      const input = document.getElementById('chat-input');
+      const msg = input.value.trim();
+      if (!msg) return;
+      input.value = '';
+      addChatMessage('👤', msg, 'text-blue-300');
+      addChatMessage('🤖', '<span class="spinner"></span>', 'text-slate-400', 'ai-loading');
+      try {
+        const data = await apiFetch('/api/chat', { method: 'POST', body: JSON.stringify({ message: msg }) });
+        document.getElementById('ai-loading')?.remove();
+        addChatMessage('🤖', data.response, 'text-indigo-300');
+      } catch (e) {
+        document.getElementById('ai-loading')?.remove();
+        addChatMessage('🤖', '⚠️ El backend de IA no está disponible. Conéctalo para respuestas en vivo.', 'text-yellow-400');
+      }
+    }
+
+    function addChatMessage(icon, html, colorClass, id = null) {
+      const msgs = document.getElementById('chat-messages');
+      const div = document.createElement('div');
+      div.className = 'flex gap-2';
+      if (id) div.id = id;
+      div.innerHTML = `<span class="${colorClass} font-bold shrink-0">${icon}</span><p class="${colorClass} text-sm">${html}</p>`;
+      msgs.appendChild(div);
+      msgs.scrollTop = msgs.scrollHeight;
+    }
+
+    // ─── REFRESH ALL ─────────────────────────────────────────────────
+    async function refreshAll() {
+      await Promise.all([loadCapitalNeto(), loadWallet(), loadInvestments()]);
+      updateCharts();
+    }
+
+    // ─── INIT ────────────────────────────────────────────────────────
+    document.addEventListener('DOMContentLoaded', () => {
+      initCharts();
+      refreshAll();
+    });
+  </script>
+</body>
+</html>
