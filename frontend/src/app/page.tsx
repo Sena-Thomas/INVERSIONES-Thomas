@@ -5,11 +5,12 @@ import { useSession, signIn, signOut } from "next-auth/react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer,
-  AreaChart, Area, PieChart, Pie, Cell
+  AreaChart, Area, PieChart, Pie, Cell, Legend
 } from "recharts";
 import {
   Activity, Wallet, TrendingUp, TrendingDown, Plus, Minus, Search, Trash2,
-  PieChart as PieChartIcon, MessageSquare, Zap, Send, ShieldAlert, CheckCircle2, LogOut, Loader2, RotateCcw
+  PieChart as PieChartIcon, MessageSquare, Zap, Send, ShieldAlert, CheckCircle2, LogOut, Loader2, RotateCcw,
+  CreditCard
 } from "lucide-react";
 import {
   getDashboardData,
@@ -56,6 +57,17 @@ interface MarketAsset {
   suggestedColor: string;
   sector: string;
 }
+
+// Tarjeta de Crédito
+interface CardTransaction {
+  id: string;
+  type: "AVANCE" | "COMPRA" | "PAGO";
+  amount: number;
+  description: string;
+  date: string;
+}
+
+const CREDIT_LIMIT = 5_000_000;
 
 const MARKET_CATALOG: MarketAsset[] = [
   { symbol: "SPY", name: "S&P 500 ETF (SPDR)", type: "ETF", description: "Replica los 500 mayores de EEUU. Diversificación máxima.", suggestedColor: "#00f0ff", sector: "Índice" },
@@ -125,6 +137,16 @@ export default function ThomasCorpApp() {
   // Search module states
   const [searchQuery, setSearchQuery] = useState("");
   const [searchFilter, setSearchFilter] = useState<"ALL" | "ETF" | "STOCK">("ALL");
+
+  // ==========================================
+  // 💳 ESTADOS: TARJETA DE CRÉDITO
+  // ==========================================
+  const [creditDebt, setCreditDebt] = useState<number>(0);
+  const creditAvailable = CREDIT_LIMIT - creditDebt;
+  const [cardTransactions, setCardTransactions] = useState<CardTransaction[]>([]);
+  const [cardOpType, setCardOpType] = useState<"AVANCE" | "COMPRA" | "PAGO">("COMPRA");
+  const [cardAmount, setCardAmount] = useState("");
+  const [cardDesc, setCardDesc] = useState("");
 
   // Investment custom update state (per-investment input)
   const [invUpdateAmounts, setInvUpdateAmounts] = useState<Record<string, string>>({});
@@ -398,6 +420,49 @@ export default function ThomasCorpApp() {
     }
   };
 
+  // ==========================================
+  // 💳 LÓGICA DE LA TARJETA DE CRÉDITO
+  // ==========================================
+  const handleCardOperation = () => {
+    const amount = parseSmartAmount(cardAmount);
+    if (!amount || amount <= 0) return;
+
+    if (cardOpType === "AVANCE" || cardOpType === "COMPRA") {
+      if (amount > creditAvailable) {
+        alert("¡Cupo insuficiente en la tarjeta!");
+        return;
+      }
+      setCreditDebt((prev) => prev + amount);
+      if (cardOpType === "AVANCE") {
+        // Avance: el dinero entra a la billetera líquida
+        setLiquidWallet((prev) => prev + amount);
+      }
+    } else {
+      // PAGO
+      if (amount > creditDebt) {
+        alert("El pago supera la deuda actual.");
+        return;
+      }
+      if (amount > liquidWallet) {
+        alert("¡Fondos líquidos insuficientes para realizar el pago!");
+        return;
+      }
+      setCreditDebt((prev) => prev - amount);
+      setLiquidWallet((prev) => prev - amount);
+    }
+
+    const newTx: CardTransaction = {
+      id: `${Date.now()}`,
+      type: cardOpType,
+      amount,
+      description: cardDesc || (cardOpType === "AVANCE" ? "Avance en efectivo" : cardOpType === "COMPRA" ? "Compra con tarjeta" : "Pago de tarjeta"),
+      date: new Date().toISOString(),
+    };
+    setCardTransactions((prev) => [newTx, ...prev]);
+    setCardAmount("");
+    setCardDesc("");
+  };
+
   const macroHistoryData = [
     { name: 'Ene', neto: 900000, gastos: 150000 },
     { name: 'Feb', neto: 1050000, gastos: 120000 },
@@ -520,16 +585,28 @@ export default function ThomasCorpApp() {
                 ].filter(d => d.value > 0)}
                 cx="50%"
                 cy="50%"
-                innerRadius={60}
-                outerRadius={90}
+                innerRadius={55}
+                outerRadius={85}
                 paddingAngle={3}
                 dataKey="value"
+                label={({ name, percent }) => `${name.length > 10 ? name.slice(0, 10) + '…' : name} ${(percent * 100).toFixed(0)}%`}
+                labelLine={false}
               >
-                {/* Cell colors are already in fill props */}
+                {[
+                  { name: "Liquidez", value: liquidWallet, fill: "#7000ff" },
+                  ...investments.map(inv => ({ name: inv.name, value: inv.currentAmount, fill: inv.color })),
+                ].filter(d => d.value > 0).map((entry, index) => (
+                  <Cell key={`cell-${index}`} fill={entry.fill} />
+                ))}
               </Pie>
               <RechartsTooltip
                 contentStyle={{ backgroundColor: '#05050A', borderColor: '#333', fontSize: '12px' }}
-                formatter={(val) => `$${(val as number)?.toLocaleString() ?? String(val)}`}
+                formatter={(val, name) => [`$${(val as number)?.toLocaleString() ?? String(val)}`, name]}
+              />
+              <Legend
+                iconType="circle"
+                iconSize={8}
+                wrapperStyle={{ fontSize: '10px', color: '#9ca3af' }}
               />
             </PieChart>
           </ResponsiveContainer>
@@ -885,6 +962,166 @@ export default function ThomasCorpApp() {
   );
 
   // ==========================================
+  // 🖥️ 8b. RENDER: MÓDULO "TARJETA DE CRÉDITO"
+  // ==========================================
+  const renderTarjeta = () => {
+    const debtPercent = CREDIT_LIMIT > 0 ? (creditDebt / CREDIT_LIMIT) * 100 : 0;
+    return (
+      <div className="space-y-6 animate-in fade-in duration-500 pb-10">
+        {/* Header */}
+        <div className="border-b border-white/5 pb-4">
+          <h2 className="text-xl font-bold text-white tracking-widest uppercase">Tarjeta de Crédito</h2>
+          <p className="text-xs text-gray-500 mt-1">Davivienda Mastercard · Gestión de cupo y deuda</p>
+        </div>
+
+        {/* Card visual */}
+        <div className="relative max-w-sm mx-auto h-48 rounded-3xl overflow-hidden shadow-2xl"
+          style={{ background: 'linear-gradient(135deg, #c00 0%, #800 100%)' }}>
+          <div className="absolute inset-0 opacity-20"
+            style={{ backgroundImage: 'radial-gradient(circle at 70% 50%, white 0%, transparent 60%)' }} />
+          <div className="absolute top-5 left-6 right-6 flex justify-between items-start">
+            <div>
+              <p className="text-[9px] text-red-200 uppercase tracking-widest">Davivienda</p>
+              <p className="text-lg font-black text-white tracking-widest">MASTERCARD</p>
+            </div>
+            <CreditCard size={32} className="text-white/70" />
+          </div>
+          <div className="absolute bottom-5 left-6 right-6">
+            <div className="flex justify-between text-xs text-red-200 mb-1">
+              <span>Cupo Total</span>
+              <span>Disponible</span>
+            </div>
+            <div className="flex justify-between text-white font-bold">
+              <span>${CREDIT_LIMIT.toLocaleString()}</span>
+              <span className={creditAvailable < CREDIT_LIMIT * 0.2 ? 'text-red-300' : 'text-white'}>${creditAvailable.toLocaleString()}</span>
+            </div>
+            {/* Progress bar */}
+            <div className="mt-2 h-1.5 rounded-full bg-white/20 overflow-hidden">
+              <div
+                className="h-full rounded-full transition-all"
+                style={{ width: `${Math.min(debtPercent, 100)}%`, backgroundColor: debtPercent > 80 ? '#ff4444' : debtPercent > 50 ? '#ffaa00' : '#ffffff' }}
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Stats row */}
+        <div className="grid grid-cols-3 gap-4">
+          <div className="bg-[#0A0A16]/80 border border-white/10 rounded-2xl p-4 text-center">
+            <p className="text-[9px] text-gray-500 uppercase tracking-widest">Cupo Total</p>
+            <p className="text-lg font-bold text-white mt-1">${CREDIT_LIMIT.toLocaleString()}</p>
+          </div>
+          <div className="bg-[#0A0A16]/80 border border-[#ff0055]/30 rounded-2xl p-4 text-center">
+            <p className="text-[9px] text-gray-500 uppercase tracking-widest">Deuda</p>
+            <p className="text-lg font-bold text-[#ff0055] mt-1">${creditDebt.toLocaleString()}</p>
+          </div>
+          <div className="bg-[#0A0A16]/80 border border-[#00ffaa]/30 rounded-2xl p-4 text-center">
+            <p className="text-[9px] text-gray-500 uppercase tracking-widest">Disponible</p>
+            <p className="text-lg font-bold text-[#00ffaa] mt-1">${creditAvailable.toLocaleString()}</p>
+          </div>
+        </div>
+
+        {/* Operations */}
+        <div className="bg-[#0A0A16]/90 border border-white/10 p-6 rounded-2xl space-y-4">
+          <h3 className="text-xs text-gray-400 uppercase tracking-widest">Registrar Movimiento</h3>
+
+          {/* Type selector */}
+          <div className="flex gap-2">
+            {(["COMPRA", "AVANCE", "PAGO"] as const).map(op => (
+              <button
+                key={op}
+                onClick={() => setCardOpType(op)}
+                className={`flex-1 py-2 rounded-xl text-xs font-bold uppercase tracking-widest transition-all border ${
+                  cardOpType === op
+                    ? op === "PAGO"
+                      ? "bg-[#00ffaa]/20 text-[#00ffaa] border-[#00ffaa]/50"
+                      : op === "AVANCE"
+                      ? "bg-[#7000ff]/20 text-[#7000ff] border-[#7000ff]/50"
+                      : "bg-[#ff0055]/20 text-[#ff0055] border-[#ff0055]/50"
+                    : "bg-transparent text-gray-500 border-white/10 hover:border-white/20"
+                }`}
+              >
+                {op}
+              </button>
+            ))}
+          </div>
+
+          <div className="text-[10px] text-gray-500 italic">
+            {cardOpType === "AVANCE" && "💡 Avance: resta cupo disponible, suma deuda y AÑADE a tu billetera líquida."}
+            {cardOpType === "COMPRA" && "💡 Compra: resta cupo disponible, suma deuda. No afecta la billetera."}
+            {cardOpType === "PAGO" && "💡 Pago: reduce la deuda, recupera disponible y DESCUENTA de tu billetera líquida."}
+          </div>
+
+          <div className="flex gap-3">
+            <div className="relative flex-1">
+              <span className="absolute left-2 top-2.5 text-gray-500 text-[10px]">$</span>
+              <input
+                type="text"
+                value={cardAmount}
+                onChange={(e) => setCardAmount(e.target.value)}
+                placeholder="Ej: 200 = $200k"
+                className="w-full bg-[#05050A] border border-white/10 rounded-xl py-2 pl-5 pr-3 text-sm text-white outline-none focus:border-[#00f0ff] transition-colors"
+              />
+            </div>
+            <input
+              type="text"
+              value={cardDesc}
+              onChange={(e) => setCardDesc(e.target.value)}
+              placeholder="Descripción (opcional)"
+              className="flex-1 bg-[#05050A] border border-white/10 rounded-xl py-2 px-3 text-sm text-white outline-none focus:border-[#00f0ff] transition-colors"
+            />
+          </div>
+          {cardAmount && parseSmartAmount(cardAmount) > 0 && (
+            <p className="text-[9px] text-[#00f0ff]/70">= ${parseSmartAmount(cardAmount).toLocaleString()}</p>
+          )}
+          <button
+            onClick={handleCardOperation}
+            disabled={!cardAmount || parseSmartAmount(cardAmount) <= 0}
+            className={`w-full py-2.5 rounded-xl text-sm font-bold uppercase tracking-widest transition-all disabled:opacity-40 disabled:cursor-not-allowed ${
+              cardOpType === "PAGO"
+                ? "bg-[#00ffaa]/10 border border-[#00ffaa]/30 text-[#00ffaa] hover:bg-[#00ffaa]/20"
+                : cardOpType === "AVANCE"
+                ? "bg-[#7000ff]/10 border border-[#7000ff]/30 text-[#7000ff] hover:bg-[#7000ff]/20"
+                : "bg-[#ff0055]/10 border border-[#ff0055]/30 text-[#ff0055] hover:bg-[#ff0055]/20"
+            }`}
+          >
+            Registrar {cardOpType}
+          </button>
+        </div>
+
+        {/* Transaction history */}
+        <div className="bg-[#0A0A16]/90 border border-white/10 p-6 rounded-2xl">
+          <h3 className="text-xs text-gray-400 uppercase tracking-widest mb-4">Historial de Movimientos</h3>
+          {cardTransactions.length === 0 ? (
+            <p className="text-xs text-gray-600 text-center py-6">Aún no hay movimientos registrados.</p>
+          ) : (
+            <div className="space-y-2 max-h-64 overflow-y-auto custom-scrollbar pr-1">
+              {cardTransactions.map((tx) => (
+                <div key={tx.id} className="flex items-center justify-between p-3 rounded-xl bg-[#05050A] border border-white/5">
+                  <div className="flex items-center gap-3">
+                    <span className={`text-[9px] px-2 py-0.5 rounded font-bold uppercase ${
+                      tx.type === "PAGO" ? "bg-[#00ffaa]/10 text-[#00ffaa]" :
+                      tx.type === "AVANCE" ? "bg-[#7000ff]/10 text-[#7000ff]" :
+                      "bg-[#ff0055]/10 text-[#ff0055]"
+                    }`}>{tx.type}</span>
+                    <span className="text-xs text-gray-300">{tx.description}</span>
+                  </div>
+                  <div className="text-right">
+                    <p className={`text-xs font-bold ${tx.type === "PAGO" ? "text-[#00ffaa]" : "text-[#ff0055]"}`}>
+                      {tx.type === "PAGO" ? "-" : "+"} ${tx.amount.toLocaleString()}
+                    </p>
+                    <p className="text-[9px] text-gray-600">{new Date(tx.date).toLocaleDateString()}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
+
+  // ==========================================
   // 🖥️ 9. RENDER: MÓDULO "SEARCH" (Placeholder Parte 3)
   // ==========================================
   const renderSearch = () => {
@@ -1095,6 +1332,11 @@ export default function ThomasCorpApp() {
             <span className="text-xs font-bold uppercase tracking-widest">Search ETF</span>
           </button>
 
+          <button onClick={() => setActiveTab("tarjeta")} className={`flex items-center gap-3 p-3 rounded-xl transition-all ${activeTab === "tarjeta" ? "bg-[#cc0000]/10 text-red-400 border border-red-700/30" : "text-gray-500 hover:bg-white/5 hover:text-white"}`}>
+            <CreditCard size={18} />
+            <span className="text-xs font-bold uppercase tracking-widest">Tarjeta</span>
+          </button>
+
           {/* Asistente IA */}
           <button onClick={() => setIsChatOpen(true)} className={`flex items-center gap-3 p-3 rounded-xl transition-all text-gray-500 hover:bg-white/5 hover:text-white`}>
             <MessageSquare size={18} />
@@ -1152,6 +1394,7 @@ export default function ThomasCorpApp() {
           {activeTab === "mi_estado" && renderMiEstado()}
           {activeTab === "inversiones" && renderInversiones()}
           {activeTab === "search" && renderSearch()}
+          {activeTab === "tarjeta" && renderTarjeta()}
         </div>
       </main>
 
@@ -1261,6 +1504,13 @@ export default function ThomasCorpApp() {
         >
           <Search size={20} />
           <span className="text-[9px] uppercase tracking-widest">ETF</span>
+        </button>
+        <button
+          onClick={() => setActiveTab("tarjeta")}
+          className={`flex flex-col items-center gap-1 px-4 py-1 rounded-xl transition-all ${activeTab === "tarjeta" ? "text-red-400" : "text-gray-500"}`}
+        >
+          <CreditCard size={20} />
+          <span className="text-[9px] uppercase tracking-widest">Tarjeta</span>
         </button>
         <button
           onClick={() => setIsChatOpen(true)}
