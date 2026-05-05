@@ -68,6 +68,8 @@ interface CardTransaction {
 }
 
 const CREDIT_LIMIT = 5_000_000;
+const CREDIT_WARNING_HIGH = 0.8;  // 80%: danger zone
+const CREDIT_WARNING_MED = 0.5;   // 50%: caution zone
 
 const MARKET_CATALOG: MarketAsset[] = [
   { symbol: "SPY", name: "S&P 500 ETF (SPDR)", type: "ETF", description: "Replica los 500 mayores de EEUU. Diversificación máxima.", suggestedColor: "#00f0ff", sector: "Índice" },
@@ -452,7 +454,7 @@ export default function ThomasCorpApp() {
     }
 
     const newTx: CardTransaction = {
-      id: `${Date.now()}`,
+      id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
       type: cardOpType,
       amount,
       description: cardDesc || (cardOpType === "AVANCE" ? "Avance en efectivo" : cardOpType === "COMPRA" ? "Compra con tarjeta" : "Pago de tarjeta"),
@@ -999,7 +1001,7 @@ export default function ThomasCorpApp() {
             <div className="mt-2 h-1.5 rounded-full bg-white/20 overflow-hidden">
               <div
                 className="h-full rounded-full transition-all"
-                style={{ width: `${Math.min(debtPercent, 100)}%`, backgroundColor: debtPercent > 80 ? '#ff4444' : debtPercent > 50 ? '#ffaa00' : '#ffffff' }}
+                style={{ width: `${Math.min(debtPercent, 100)}%`, backgroundColor: debtPercent > CREDIT_WARNING_HIGH * 100 ? '#ff4444' : debtPercent > CREDIT_WARNING_MED * 100 ? '#ffaa00' : '#ffffff' }}
               />
             </div>
           </div>
@@ -1108,7 +1110,7 @@ export default function ThomasCorpApp() {
                   </div>
                   <div className="text-right">
                     <p className={`text-xs font-bold ${tx.type === "PAGO" ? "text-[#00ffaa]" : "text-[#ff0055]"}`}>
-                      {tx.type === "PAGO" ? "-" : "+"} ${tx.amount.toLocaleString()}
+                      {tx.type === "PAGO" ? "+" : "-"} ${tx.amount.toLocaleString()}
                     </p>
                     <p className="text-[9px] text-gray-600">{new Date(tx.date).toLocaleDateString()}</p>
                   </div>
