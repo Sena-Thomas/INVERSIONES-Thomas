@@ -591,7 +591,9 @@ export default function ThomasCorpApp() {
                 outerRadius={85}
                 paddingAngle={3}
                 dataKey="value"
-                label={({ name, percent }) => `${name.length > 10 ? name.slice(0, 10) + '…' : name} ${(percent * 100).toFixed(0)}%`}
+                label={({ name, percent }) =>
+                  `${typeof name === "string" ? (name.length > 10 ? name.slice(0, 10) + "…" : name) : "N/A"} ${(percent * 100).toFixed(0)}%`
+                }
                 labelLine={false}
               >
                 {[
