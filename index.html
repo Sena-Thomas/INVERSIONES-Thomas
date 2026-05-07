@@ -1,0 +1,610 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Giga-Terminal Financiero</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            dark: { 900: '#0d1117', 800: '#161b22', 700: '#21262d', 600: '#30363d' },
+            accent: { DEFAULT: '#58a6ff', green: '#3fb950', red: '#f85149', yellow: '#d29922' }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    body { background-color: #0d1117; color: #c9d1d9; font-family: 'Segoe UI', system-ui, sans-serif; }
+    .card { background: #161b22; border: 1px solid #30363d; border-radius: 12px; }
+    .btn-primary { background: #58a6ff; color: #0d1117; font-weight: 700; border-radius: 8px; padding: 8px 18px; transition: opacity .2s; }
+    .btn-primary:hover { opacity: .85; }
+    .btn-danger { background: #f85149; color: #fff; font-weight: 700; border-radius: 8px; padding: 6px 14px; transition: opacity .2s; }
+    .btn-danger:hover { opacity: .85; }
+    .nav-link { cursor: pointer; padding: 8px 16px; border-radius: 8px; transition: background .2s; }
+    .nav-link:hover, .nav-link.active { background: #21262d; color: #58a6ff; }
+    .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.7); display: flex; align-items: center; justify-content: center; z-index: 50; }
+    .input-field { background: #21262d; border: 1px solid #30363d; border-radius: 8px; padding: 8px 12px; color: #c9d1d9; width: 100%; outline: none; }
+    .input-field:focus { border-color: #58a6ff; }
+    .tag-pasiva { background: #1f4068; color: #58a6ff; border-radius: 6px; padding: 2px 8px; font-size: 0.75rem; font-weight: 700; }
+    .tag-activa { background: #1a3a2a; color: #3fb950; border-radius: 6px; padding: 2px 8px; font-size: 0.75rem; font-weight: 700; }
+    ::-webkit-scrollbar { width: 6px; } ::-webkit-scrollbar-track { background: #161b22; } ::-webkit-scrollbar-thumb { background: #30363d; border-radius: 3px; }
+  </style>
+</head>
+<body class="min-h-screen">
+
+  <!-- NAV -->
+  <nav class="sticky top-0 z-40 border-b border-dark-600" style="background:#161b22;">
+    <div class="max-w-7xl mx-auto px-4 flex items-center justify-between h-14">
+      <span class="text-accent font-extrabold text-xl tracking-tight"><i class="fa-solid fa-bolt mr-2"></i>Giga-Terminal</span>
+      <div class="flex gap-1 text-sm font-medium" id="nav">
+        <span class="nav-link active" data-tab="estado"><i class="fa-solid fa-chart-pie mr-1"></i>Mi Estado</span>
+        <span class="nav-link" data-tab="inversiones"><i class="fa-solid fa-sack-dollar mr-1"></i>Inversiones</span>
+        <span class="nav-link" data-tab="search"><i class="fa-solid fa-magnifying-glass-dollar mr-1"></i>Buscar</span>
+        <span class="nav-link" data-tab="ia"><i class="fa-solid fa-robot mr-1"></i>IA</span>
+      </div>
+    </div>
+  </nav>
+
+  <main class="max-w-7xl mx-auto px-4 py-8">
+
+    <!-- ============== TAB: MI ESTADO ============== -->
+    <div id="tab-estado">
+      <!-- Capital Neto Header -->
+      <div class="card p-6 mb-6 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div>
+          <p class="text-sm text-gray-400 mb-1"><i class="fa-solid fa-coins mr-1"></i>Capital Neto Total</p>
+          <p id="capital-neto" class="text-4xl font-extrabold text-accent-green">$0.00</p>
+        </div>
+        <div class="flex gap-6">
+          <div class="text-center">
+            <p class="text-xs text-gray-400">Billetera</p>
+            <p id="saldo-billetera-header" class="text-xl font-bold text-accent">$0.00</p>
+          </div>
+          <div class="text-center">
+            <p class="text-xs text-gray-400">Inversiones</p>
+            <p id="total-inversiones-header" class="text-xl font-bold text-accent-yellow">$0.00</p>
+          </div>
+        </div>
+        <button class="btn-primary text-sm" onclick="refreshEstado()"><i class="fa-solid fa-rotate-right mr-1"></i>Actualizar</button>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+        <!-- Billetera / Gastos Hormiga -->
+        <div class="card p-5">
+          <div class="flex items-center justify-between mb-4">
+            <h2 class="font-bold text-lg"><i class="fa-solid fa-wallet mr-2 text-accent"></i>Billetera &amp; Gastos Hormiga</h2>
+            <button class="btn-primary text-xs" onclick="openWalletModal()"><i class="fa-solid fa-plus mr-1"></i>Agregar</button>
+          </div>
+          <div id="wallet-list" class="space-y-2 max-h-72 overflow-y-auto pr-1">
+            <p class="text-gray-500 text-sm text-center py-4">Cargando movimientos...</p>
+          </div>
+          <div class="mt-4 pt-4 border-t border-dark-600 flex justify-between items-center">
+            <span class="text-sm text-gray-400">Saldo disponible</span>
+            <span id="saldo-billetera" class="font-extrabold text-accent">$0.00</span>
+          </div>
+        </div>
+
+        <!-- Chart Capital Neto -->
+        <div class="card p-5">
+          <h2 class="font-bold text-lg mb-4"><i class="fa-solid fa-chart-donut mr-2 text-accent-yellow"></i>Distribución de Capital</h2>
+          <div class="relative h-64">
+            <canvas id="capitalChart"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <!-- Resumen Inversiones mini -->
+      <div class="card p-5">
+        <h2 class="font-bold text-lg mb-4"><i class="fa-solid fa-chart-bar mr-2 text-accent-green"></i>Rendimiento Inversiones</h2>
+        <div class="relative h-64">
+          <canvas id="invChart"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============== TAB: INVERSIONES ============== -->
+    <div id="tab-inversiones" class="hidden">
+      <div class="flex items-center justify-between mb-6">
+        <h1 class="text-2xl font-extrabold"><i class="fa-solid fa-sack-dollar mr-2 text-accent-yellow"></i>Mis Inversiones</h1>
+        <button class="btn-primary" onclick="openInvModal()"><i class="fa-solid fa-plus mr-1"></i>Nueva Inversión</button>
+      </div>
+
+      <!-- Pasivas -->
+      <div class="mb-8">
+        <h2 class="font-bold text-base mb-3 text-accent"><i class="fa-solid fa-seedling mr-1"></i>Pasivas (Hold / ETF)</h2>
+        <div id="list-pasivas" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <p class="text-gray-500 text-sm">Sin inversiones pasivas aún.</p>
+        </div>
+      </div>
+
+      <!-- Activas -->
+      <div>
+        <h2 class="font-bold text-base mb-3 text-accent-green"><i class="fa-solid fa-fire mr-1"></i>Activas (Trading)</h2>
+        <div id="list-activas" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <p class="text-gray-500 text-sm">Sin inversiones activas aún.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============== TAB: SEARCH ============== -->
+    <div id="tab-search" class="hidden">
+      <h1 class="text-2xl font-extrabold mb-6"><i class="fa-solid fa-magnifying-glass-dollar mr-2 text-accent"></i>Buscar Activo</h1>
+      <div class="card p-6 max-w-xl mx-auto">
+        <div class="flex gap-3 mb-6">
+          <input id="search-input" class="input-field flex-1" placeholder="Ej: AAPL, SPY, BTC-USD" type="text"
+            onkeydown="if(event.key==='Enter') searchAsset()" />
+          <button class="btn-primary" onclick="searchAsset()"><i class="fa-solid fa-search mr-1"></i>Buscar</button>
+        </div>
+        <div id="search-result" class="hidden">
+          <div class="flex items-center justify-between mb-4">
+            <div>
+              <p id="res-ticker" class="text-2xl font-extrabold text-accent"></p>
+              <p class="text-xs text-gray-400">Precio en tiempo real (1 mes)</p>
+            </div>
+            <div class="text-right">
+              <p id="res-price" class="text-3xl font-extrabold text-accent-green"></p>
+              <p class="text-xs text-gray-400">SMA 20: <span id="res-sma" class="text-accent-yellow font-bold"></span></p>
+            </div>
+          </div>
+          <div id="res-signal" class="rounded-lg p-3 text-sm font-bold text-center mb-4"></div>
+          <button id="res-add-btn" class="btn-primary w-full" onclick="addFromSearch()"><i class="fa-solid fa-plus mr-1"></i>Agregar a Inversiones</button>
+        </div>
+        <div id="search-error" class="hidden text-accent-red text-sm text-center py-3"></div>
+        <div id="search-loading" class="hidden text-gray-400 text-sm text-center py-3"><i class="fa-solid fa-spinner fa-spin mr-1"></i>Consultando...</div>
+
+        <!-- Populares -->
+        <div class="mt-6 border-t border-dark-600 pt-4">
+          <p class="text-xs text-gray-400 mb-3">Búsquedas rápidas:</p>
+          <div class="flex flex-wrap gap-2">
+            <span class="cursor-pointer text-xs bg-dark-700 hover:bg-dark-600 px-3 py-1 rounded-full text-gray-300 border border-dark-600" onclick="quickSearch('SPY')">SPY</span>
+            <span class="cursor-pointer text-xs bg-dark-700 hover:bg-dark-600 px-3 py-1 rounded-full text-gray-300 border border-dark-600" onclick="quickSearch('QQQ')">QQQ</span>
+            <span class="cursor-pointer text-xs bg-dark-700 hover:bg-dark-600 px-3 py-1 rounded-full text-gray-300 border border-dark-600" onclick="quickSearch('AAPL')">AAPL</span>
+            <span class="cursor-pointer text-xs bg-dark-700 hover:bg-dark-600 px-3 py-1 rounded-full text-gray-300 border border-dark-600" onclick="quickSearch('MSFT')">MSFT</span>
+            <span class="cursor-pointer text-xs bg-dark-700 hover:bg-dark-600 px-3 py-1 rounded-full text-gray-300 border border-dark-600" onclick="quickSearch('BTC-USD')">BTC-USD</span>
+            <span class="cursor-pointer text-xs bg-dark-700 hover:bg-dark-600 px-3 py-1 rounded-full text-gray-300 border border-dark-600" onclick="quickSearch('ETH-USD')">ETH-USD</span>
+            <span class="cursor-pointer text-xs bg-dark-700 hover:bg-dark-600 px-3 py-1 rounded-full text-gray-300 border border-dark-600" onclick="quickSearch('NVDA')">NVDA</span>
+            <span class="cursor-pointer text-xs bg-dark-700 hover:bg-dark-600 px-3 py-1 rounded-full text-gray-300 border border-dark-600" onclick="quickSearch('AMZN')">AMZN</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============== TAB: IA ============== -->
+    <div id="tab-ia" class="hidden">
+      <h1 class="text-2xl font-extrabold mb-6"><i class="fa-solid fa-robot mr-2 text-accent"></i>Giga.IA — Asesor Financiero</h1>
+      <div class="card p-5 max-w-2xl mx-auto">
+        <div id="chat-messages" class="space-y-3 mb-4 max-h-96 overflow-y-auto pr-1">
+          <div class="flex gap-3">
+            <div class="w-8 h-8 rounded-full bg-accent flex-shrink-0 flex items-center justify-center text-dark-900 font-bold text-sm">G</div>
+            <div class="bg-dark-700 rounded-xl p-3 text-sm text-gray-300 max-w-sm">¡Hola! Soy Giga.IA, tu asesor financiero Giga-chad. ¿En qué te puedo ayudar hoy?</div>
+          </div>
+        </div>
+        <div class="flex gap-3">
+          <input id="chat-input" class="input-field flex-1 text-sm" placeholder="Pregúntame sobre inversiones, mercados, estrategias..." type="text"
+            onkeydown="if(event.key==='Enter') sendChat()" />
+          <button class="btn-primary text-sm" onclick="sendChat()"><i class="fa-solid fa-paper-plane"></i></button>
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- ============ MODAL: WALLET ============ -->
+  <div id="modal-wallet" class="modal-overlay hidden">
+    <div class="card p-6 w-full max-w-md mx-4">
+      <div class="flex items-center justify-between mb-5">
+        <h2 class="font-bold text-lg"><i class="fa-solid fa-wallet mr-2 text-accent"></i>Nuevo Movimiento</h2>
+        <button onclick="closeModal('modal-wallet')" class="text-gray-500 hover:text-white text-xl"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="space-y-4">
+        <div>
+          <label class="text-xs text-gray-400 mb-1 block">Tipo</label>
+          <select id="w-type" class="input-field">
+            <option value="INGRESO">💰 Ingreso</option>
+            <option value="GASTO">🛒 Gasto Hormiga</option>
+          </select>
+        </div>
+        <div>
+          <label class="text-xs text-gray-400 mb-1 block">Descripción</label>
+          <input id="w-desc" class="input-field" placeholder="Ej: Café, sueldo, Uber..." type="text" />
+        </div>
+        <div>
+          <label class="text-xs text-gray-400 mb-1 block">Monto ($)</label>
+          <input id="w-amount" class="input-field" placeholder="0.00" type="number" min="0" step="0.01" />
+        </div>
+      </div>
+      <div class="flex gap-3 mt-6">
+        <button onclick="closeModal('modal-wallet')" class="flex-1 py-2 rounded-lg border border-dark-600 text-sm hover:bg-dark-700 transition">Cancelar</button>
+        <button onclick="submitWallet()" class="flex-1 btn-primary text-sm">Guardar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ MODAL: INVERSIÓN ============ -->
+  <div id="modal-inv" class="modal-overlay hidden">
+    <div class="card p-6 w-full max-w-md mx-4">
+      <div class="flex items-center justify-between mb-5">
+        <h2 class="font-bold text-lg"><i class="fa-solid fa-sack-dollar mr-2 text-accent-yellow"></i>Nueva Inversión</h2>
+        <button onclick="closeModal('modal-inv')" class="text-gray-500 hover:text-white text-xl"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="space-y-4">
+        <div>
+          <label class="text-xs text-gray-400 mb-1 block">Tipo de Inversión</label>
+          <select id="inv-type" class="input-field">
+            <option value="PASIVA">🌱 Pasiva (Hold / ETF)</option>
+            <option value="ACTIVA">🔥 Activa (Trading)</option>
+          </select>
+        </div>
+        <div>
+          <label class="text-xs text-gray-400 mb-1 block">Nombre del Activo (Ticker)</label>
+          <input id="inv-name" class="input-field" placeholder="Ej: SPY, AAPL, BTC" type="text" />
+        </div>
+        <div>
+          <label class="text-xs text-gray-400 mb-1 block">Monto Invertido ($)</label>
+          <input id="inv-invested" class="input-field" placeholder="0.00" type="number" min="0" step="0.01" />
+        </div>
+        <div>
+          <label class="text-xs text-gray-400 mb-1 block">Valor Actual ($)</label>
+          <input id="inv-current" class="input-field" placeholder="0.00" type="number" min="0" step="0.01" />
+        </div>
+        <div>
+          <label class="text-xs text-gray-400 mb-1 block">Color de la tarjeta</label>
+          <div class="flex gap-2 flex-wrap" id="color-picker">
+            <span class="color-dot cursor-pointer w-7 h-7 rounded-full border-2 border-transparent" style="background:#1f4068" data-color="#1f4068" onclick="selectColor(this)"></span>
+            <span class="color-dot cursor-pointer w-7 h-7 rounded-full border-2 border-transparent" style="background:#1a3a2a" data-color="#1a3a2a" onclick="selectColor(this)"></span>
+            <span class="color-dot cursor-pointer w-7 h-7 rounded-full border-2 border-transparent" style="background:#3d1f1f" data-color="#3d1f1f" onclick="selectColor(this)"></span>
+            <span class="color-dot cursor-pointer w-7 h-7 rounded-full border-2 border-transparent" style="background:#2d1f3d" data-color="#2d1f3d" onclick="selectColor(this)"></span>
+            <span class="color-dot cursor-pointer w-7 h-7 rounded-full border-2 border-transparent" style="background:#3d3d1f" data-color="#3d3d1f" onclick="selectColor(this)"></span>
+            <span class="color-dot cursor-pointer w-7 h-7 rounded-full border-2 border-transparent" style="background:#1f3d3d" data-color="#1f3d3d" onclick="selectColor(this)"></span>
+          </div>
+        </div>
+      </div>
+      <div class="flex gap-3 mt-6">
+        <button onclick="closeModal('modal-inv')" class="flex-1 py-2 rounded-lg border border-dark-600 text-sm hover:bg-dark-700 transition">Cancelar</button>
+        <button onclick="submitInvestment()" class="flex-1 btn-primary text-sm">Guardar</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ======== STATE ========
+    const state = {
+      investments: [],
+      wallet: { saldo_billetera: 0, movimientos: [] },
+      capitalNeto: { capital_neto_total: 0, desglose: { billetera: 0, inversiones: 0 } },
+      selectedColor: '#1f4068',
+      searchData: null,
+      charts: { capital: null, inv: null }
+    };
+
+    // ======== NAVIGATION ========
+    document.querySelectorAll('#nav .nav-link').forEach(el => {
+      el.addEventListener('click', () => {
+        document.querySelectorAll('#nav .nav-link').forEach(x => x.classList.remove('active'));
+        el.classList.add('active');
+        const tab = el.dataset.tab;
+        ['estado', 'inversiones', 'search', 'ia'].forEach(t => {
+          document.getElementById('tab-' + t).classList.toggle('hidden', t !== tab);
+        });
+        if (tab === 'estado') refreshEstado();
+        if (tab === 'inversiones') loadInvestments();
+      });
+    });
+
+    // ======== FORMAT CURRENCY ========
+    const fmt = n => '$' + Number(n || 0).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+    // ======== API HELPERS ========
+    async function apiFetch(url, opts = {}) {
+      const res = await fetch(url, opts);
+      if (!res.ok) throw new Error((await res.json().catch(() => ({detail: res.statusText}))).detail || res.statusText);
+      return res.json();
+    }
+
+    // ======== ESTADO MODULE ========
+    async function refreshEstado() {
+      try {
+        const [cn, wallet, investments] = await Promise.all([
+          apiFetch('/api/capital-neto'),
+          apiFetch('/api/wallet'),
+          apiFetch('/api/investments')
+        ]);
+        state.capitalNeto = cn;
+        state.wallet = wallet;
+        state.investments = investments;
+        renderEstado();
+      } catch (e) {
+        console.warn('Backend not available, using local state:', e.message);
+        renderEstado();
+      }
+    }
+
+    function renderEstado() {
+      const { capital_neto_total, desglose } = state.capitalNeto;
+      document.getElementById('capital-neto').textContent = fmt(capital_neto_total);
+      document.getElementById('saldo-billetera-header').textContent = fmt(desglose.billetera);
+      document.getElementById('total-inversiones-header').textContent = fmt(desglose.inversiones);
+      document.getElementById('saldo-billetera').textContent = fmt(state.wallet.saldo_billetera || 0);
+      renderWalletList();
+      renderCapitalChart();
+      renderInvChart();
+    }
+
+    function renderWalletList() {
+      const list = document.getElementById('wallet-list');
+      const movs = state.wallet.movimientos || [];
+      if (!movs.length) {
+        list.innerHTML = '<p class="text-gray-500 text-sm text-center py-4">Sin movimientos aún.</p>';
+        return;
+      }
+      list.innerHTML = movs.slice(0, 20).map(m => `
+        <div class="flex items-center justify-between bg-dark-700 rounded-lg px-3 py-2 text-sm">
+          <div class="flex items-center gap-2">
+            <i class="fa-solid ${m.type === 'INGRESO' ? 'fa-arrow-up text-accent-green' : 'fa-arrow-down text-accent-red'}"></i>
+            <span class="text-gray-300">${m.description || m.type}</span>
+          </div>
+          <span class="font-bold ${m.type === 'INGRESO' ? 'text-accent-green' : 'text-accent-red'}">
+            ${m.type === 'INGRESO' ? '+' : '-'}${fmt(m.amount)}
+          </span>
+        </div>
+      `).join('');
+    }
+
+    function renderCapitalChart() {
+      const { desglose } = state.capitalNeto;
+      const ctx = document.getElementById('capitalChart').getContext('2d');
+      if (state.charts.capital) state.charts.capital.destroy();
+      state.charts.capital = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+          labels: ['Billetera', 'Inversiones'],
+          datasets: [{ data: [Math.max(0, desglose.billetera), Math.max(0, desglose.inversiones)], backgroundColor: ['#58a6ff', '#d29922'], borderWidth: 2, borderColor: '#161b22' }]
+        },
+        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { color: '#c9d1d9' } } } }
+      });
+    }
+
+    function renderInvChart() {
+      const invs = state.investments;
+      const ctx = document.getElementById('invChart').getContext('2d');
+      if (state.charts.inv) state.charts.inv.destroy();
+      if (!invs.length) return;
+      const labels = invs.map(i => i.asset_name);
+      const invested = invs.map(i => i.invested_amount);
+      const current = invs.map(i => i.current_value);
+      state.charts.inv = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels,
+          datasets: [
+            { label: 'Invertido', data: invested, backgroundColor: '#30363d' },
+            { label: 'Valor Actual', data: current, backgroundColor: '#3fb950' }
+          ]
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          plugins: { legend: { labels: { color: '#c9d1d9' } } },
+          scales: { x: { ticks: { color: '#8b949e' }, grid: { color: '#21262d' } }, y: { ticks: { color: '#8b949e' }, grid: { color: '#21262d' } } }
+        }
+      });
+    }
+
+    // ======== WALLET MODAL ========
+    function openWalletModal() { document.getElementById('modal-wallet').classList.remove('hidden'); }
+
+    async function submitWallet() {
+      const type = document.getElementById('w-type').value;
+      const description = document.getElementById('w-desc').value || type;
+      const amount = parseFloat(document.getElementById('w-amount').value);
+      if (!amount || amount <= 0) { alert('Ingresa un monto válido.'); return; }
+      try {
+        await apiFetch('/api/wallet', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ type, description, amount })
+        });
+        closeModal('modal-wallet');
+        document.getElementById('w-desc').value = '';
+        document.getElementById('w-amount').value = '';
+        refreshEstado();
+      } catch (e) {
+        alert('Error: ' + e.message);
+      }
+    }
+
+    // ======== INVESTMENTS MODULE ========
+    async function loadInvestments() {
+      try {
+        state.investments = await apiFetch('/api/investments');
+      } catch (e) {
+        console.warn('Could not load investments:', e.message);
+      }
+      renderInvestments();
+    }
+
+    function renderInvestments() {
+      const pasivas = state.investments.filter(i => i.type === 'PASIVA');
+      const activas = state.investments.filter(i => i.type === 'ACTIVA');
+      document.getElementById('list-pasivas').innerHTML = pasivas.length
+        ? pasivas.map(invCard).join('')
+        : '<p class="text-gray-500 text-sm">Sin inversiones pasivas aún.</p>';
+      document.getElementById('list-activas').innerHTML = activas.length
+        ? activas.map(invCard).join('')
+        : '<p class="text-gray-500 text-sm">Sin inversiones activas aún.</p>';
+    }
+
+    function invCard(inv) {
+      const gain = inv.current_value - inv.invested_amount;
+      const pct = inv.invested_amount ? ((gain / inv.invested_amount) * 100).toFixed(2) : '0.00';
+      const color = inv.color || (inv.type === 'PASIVA' ? '#1f4068' : '#1a3a2a');
+      return `
+        <div class="card p-4 relative" style="background:${color}; border-color: #30363d;">
+          <div class="flex items-start justify-between mb-2">
+            <div>
+              <span class="tag-${inv.type.toLowerCase()}">${inv.type}</span>
+              <p class="font-extrabold text-lg mt-1 text-white">${inv.asset_name}</p>
+            </div>
+            <button class="btn-danger text-xs" onclick="deleteInvestment(${inv.id})"><i class="fa-solid fa-trash"></i></button>
+          </div>
+          <div class="flex justify-between text-sm mt-3">
+            <div>
+              <p class="text-xs text-gray-400">Invertido</p>
+              <p class="font-bold text-gray-200">${fmt(inv.invested_amount)}</p>
+            </div>
+            <div class="text-right">
+              <p class="text-xs text-gray-400">Valor Actual</p>
+              <p class="font-bold text-white">${fmt(inv.current_value)}</p>
+            </div>
+          </div>
+          <div class="mt-2 flex items-center gap-2">
+            <span class="text-xs font-bold ${gain >= 0 ? 'text-accent-green' : 'text-accent-red'}">
+              ${gain >= 0 ? '+' : ''}${fmt(gain)} (${gain >= 0 ? '+' : ''}${pct}%)
+            </span>
+          </div>
+        </div>
+      `;
+    }
+
+    function openInvModal() { document.getElementById('modal-inv').classList.remove('hidden'); }
+
+    function selectColor(el) {
+      document.querySelectorAll('.color-dot').forEach(d => d.style.borderColor = 'transparent');
+      el.style.borderColor = '#58a6ff';
+      state.selectedColor = el.dataset.color;
+    }
+
+    async function submitInvestment() {
+      const type = document.getElementById('inv-type').value;
+      const asset_name = document.getElementById('inv-name').value.trim().toUpperCase();
+      const invested_amount = parseFloat(document.getElementById('inv-invested').value);
+      const current_value = parseFloat(document.getElementById('inv-current').value);
+      if (!asset_name) { alert('Ingresa el nombre del activo.'); return; }
+      if (isNaN(invested_amount) || invested_amount <= 0) { alert('Ingresa un monto invertido válido.'); return; }
+      if (isNaN(current_value) || current_value < 0) { alert('Ingresa un valor actual válido.'); return; }
+      try {
+        await apiFetch('/api/investments', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ type, asset_name, invested_amount, current_value, color: state.selectedColor })
+        });
+        closeModal('modal-inv');
+        document.getElementById('inv-name').value = '';
+        document.getElementById('inv-invested').value = '';
+        document.getElementById('inv-current').value = '';
+        loadInvestments();
+      } catch (e) {
+        alert('Error: ' + e.message);
+      }
+    }
+
+    async function deleteInvestment(id) {
+      if (!confirm('¿Eliminar esta inversión?')) return;
+      try {
+        await apiFetch('/api/investments/' + id, { method: 'DELETE' });
+        loadInvestments();
+        refreshEstado();
+      } catch (e) {
+        alert('Error: ' + e.message);
+      }
+    }
+
+    // ======== SEARCH MODULE ========
+    function quickSearch(ticker) {
+      document.getElementById('search-input').value = ticker;
+      searchAsset();
+    }
+
+    async function searchAsset() {
+      const ticker = document.getElementById('search-input').value.trim().toUpperCase();
+      if (!ticker) return;
+      document.getElementById('search-result').classList.add('hidden');
+      document.getElementById('search-error').classList.add('hidden');
+      document.getElementById('search-loading').classList.remove('hidden');
+      try {
+        const data = await apiFetch('/api/asset/' + ticker);
+        state.searchData = data;
+        document.getElementById('res-ticker').textContent = data.asset;
+        document.getElementById('res-price').textContent = fmt(data.real_price);
+        document.getElementById('res-sma').textContent = fmt(data.sma_20);
+        const sig = document.getElementById('res-signal');
+        if (data.real_price > data.sma_20) {
+          sig.textContent = '📈 Precio por ENCIMA de SMA20 — Tendencia ALCISTA';
+          sig.className = 'rounded-lg p-3 text-sm font-bold text-center mb-4 bg-green-900 text-accent-green';
+        } else {
+          sig.textContent = '📉 Precio por DEBAJO de SMA20 — Tendencia BAJISTA';
+          sig.className = 'rounded-lg p-3 text-sm font-bold text-center mb-4 bg-red-900 text-accent-red';
+        }
+        document.getElementById('search-result').classList.remove('hidden');
+      } catch (e) {
+        document.getElementById('search-error').textContent = '❌ ' + e.message;
+        document.getElementById('search-error').classList.remove('hidden');
+      } finally {
+        document.getElementById('search-loading').classList.add('hidden');
+      }
+    }
+
+    function addFromSearch() {
+      if (!state.searchData) return;
+      document.getElementById('inv-name').value = state.searchData.asset;
+      document.getElementById('inv-current').value = state.searchData.real_price;
+      document.getElementById('modal-inv').classList.remove('hidden');
+      document.querySelectorAll('#nav .nav-link').forEach(x => x.classList.remove('active'));
+      document.querySelector('[data-tab="inversiones"]').classList.add('active');
+      ['estado', 'inversiones', 'search', 'ia'].forEach(t => {
+        document.getElementById('tab-' + t).classList.toggle('hidden', t !== 'inversiones');
+      });
+    }
+
+    // ======== IA MODULE ========
+    async function sendChat() {
+      const input = document.getElementById('chat-input');
+      const msg = input.value.trim();
+      if (!msg) return;
+      input.value = '';
+      const messages = document.getElementById('chat-messages');
+      messages.innerHTML += `
+        <div class="flex gap-3 justify-end">
+          <div class="bg-accent text-dark-900 rounded-xl p-3 text-sm max-w-sm">${msg}</div>
+          <div class="w-8 h-8 rounded-full bg-dark-600 flex-shrink-0 flex items-center justify-center text-sm">🧑</div>
+        </div>`;
+      messages.scrollTop = messages.scrollHeight;
+      try {
+        const res = await apiFetch('/api/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ message: msg })
+        });
+        messages.innerHTML += `
+          <div class="flex gap-3">
+            <div class="w-8 h-8 rounded-full bg-accent flex-shrink-0 flex items-center justify-center text-dark-900 font-bold text-sm">G</div>
+            <div class="bg-dark-700 rounded-xl p-3 text-sm text-gray-300 max-w-sm">${res.response}</div>
+          </div>`;
+      } catch (e) {
+        messages.innerHTML += `
+          <div class="flex gap-3">
+            <div class="w-8 h-8 rounded-full bg-accent flex-shrink-0 flex items-center justify-center text-dark-900 font-bold text-sm">G</div>
+            <div class="bg-dark-700 rounded-xl p-3 text-sm text-accent-red max-w-sm">⚠️ Backend no disponible: ${e.message}</div>
+          </div>`;
+      }
+      messages.scrollTop = messages.scrollHeight;
+    }
+
+    // ======== MODAL HELPERS ========
+    function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
+    document.addEventListener('click', e => {
+      ['modal-wallet', 'modal-inv'].forEach(id => {
+        if (e.target.id === id) closeModal(id);
+      });
+    });
+
+    // ======== INIT ========
+    refreshEstado();
+  </script>
+</body>
+</html>
